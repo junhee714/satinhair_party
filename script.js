@@ -44,61 +44,91 @@
   // mirrored outward again and again, so the wallpaper simply keeps going.
   // The mirror makes the seam invisible.
   // --------------------------------------------------------------------------
-  const SIDE_STRIP = 0.036;   // fraction of image width used as the repeating strip
+  const SIDE_STRIP = 0.058;   // fraction of image width used as the repeating strip (the part of the wallpaper left of the dialogue box / icons)
 
+  // A clean wallpaper strip taken from the left / right edge of the picture. The corner ornaments (top ≈ 0–9.5 %, bottom ≈ 89.5–100 %)
+  // are painted over with wallpaper rows from just below / above, so no ornament pieces get mirrored into the side bars.
+  function sideStrip(img, right, patch) {
+    const key = [img.currentSrc, right, patch].join("|");
+    if (img._strips && img._strips[key]) return img._strips[key];
+    const nw = img.naturalWidth, nh = img.naturalHeight, sw = Math.max(8, Math.round(nw * SIDE_STRIP));
+    const cv = document.createElement("canvas");
+    cv.width = sw; cv.height = nh;
+    const c = cv.getContext("2d");
+    const sx = right ? nw - sw : 0;
+    c.drawImage(img, sx, 0, sw, nh, 0, 0, sw, nh);
+    if (patch) {
+      const t = Math.round(nh * 0.095), b = Math.round(nh * 0.895), hb = nh - b;
+      c.drawImage(img, sx, t, sw, t, 0, 0, sw, t);
+    }
+    (img._strips = img._strips || {})[key] = cv;
+    return cv;
+  }
+
+  // Side bars are two small canvases (just the bars, not the whole screen) → much less memory / redraw work than a full-screen canvas.
   function drawSideFill(sceneEl, img, L) {
     if (img.tagName !== "IMG") return;
-    let cv = sceneEl.querySelector(":scope > .scene-fill");
+    const old = sceneEl.querySelector(":scope > canvas.scene-fill:not(.fill-l):not(.fill-r)");
+    if (old) old.remove();
+    let cvL = sceneEl.querySelector(":scope > .scene-fill.fill-l"), cvR = sceneEl.querySelector(":scope > .scene-fill.fill-r");
     if (L.offsetX < 1 || L.offsetY > 1) {              // no side bars (or top/bottom bars): nothing to fill
-      if (cv) cv.style.display = "none";
+      if (cvL) cvL.style.display = "none";
+      if (cvR) cvR.style.display = "none";
       return;
     }
     if (!img.complete || !img.naturalWidth) {
       if (!img._fillWait) { img._fillWait = true; img.addEventListener("load", () => { img._fillWait = false; layoutPhotoScene(sceneEl); }, { once: true }); }
       return;
     }
-    if (!cv) {
-      cv = document.createElement("canvas");
-      cv.className = "scene-fill";
-      sceneEl.insertBefore(cv, sceneEl.firstChild);
+    if (!cvL) {
+      cvL = document.createElement("canvas"); cvL.className = "scene-fill fill-l";
+      cvR = document.createElement("canvas"); cvR.className = "scene-fill fill-r";
+      sceneEl.insertBefore(cvR, sceneEl.firstChild); sceneEl.insertBefore(cvL, sceneEl.firstChild);
     }
-    cv.style.display = "block";
+    const patch = img.id !== "introBg";                  // (the intro curtain picture has no corner ornaments)
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const key = [L.boxW, L.boxH, L.offsetX, L.renderW, dpr, img.currentSrc].join("|");
-    if (cv._key === key) return;
-    cv._key = key;
-    cv.width = Math.round(L.boxW * dpr);
-    cv.height = Math.round(L.boxH * dpr);
-    cv.style.width = `${L.boxW}px`;
-    cv.style.height = `${L.boxH}px`;
-    const ctx = cv.getContext("2d");
-    ctx.imageSmoothingQuality = "high";
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const nw = img.naturalWidth, nh = img.naturalHeight;
-    const sw = Math.max(8, Math.round(nw * SIDE_STRIP));
-    const k = L.renderW / nw;                 // css px per image px
-    const tileW = sw * k;
-    const tiles = Math.ceil(L.offsetX / tileW) + 1;
-    // the image itself goes underneath too, so the soft blur (CSS) never leaves transparent edges
-    ctx.drawImage(img, 0, 0, nw, nh, L.offsetX, L.offsetY, L.renderW, L.renderH);
-    for (let i = 0; i < tiles; i++) {
-      // left side: tile 0 is the mirrored strip right next to the seam
-      const lx = L.offsetX - (i + 1) * tileW;
-      const rx = L.offsetX + L.renderW + i * tileW;
-      const flipped = i % 2 === 0;
-      drawStrip(ctx, img, 0, sw, nh, lx, L.offsetY, tileW, L.renderH, flipped);
-      drawStrip(ctx, img, nw - sw, sw, nh, rx, L.offsetY, tileW, L.renderH, flipped);
+    cvL.style.display = cvR.style.display = "block";
+    if (cvL._key === key) return;
+    cvL._key = key;
+    const nw = img.naturalWidth;
+    const k = L.renderW / nw;                            // css px per image px
+    const stripL = sideStrip(img, false, patch), stripR = sideStrip(img, true, patch);
+    // Two bands: the wallpaper (top) can use a wide strip; the lower part (baseboard / floor) must use a narrower one,
+    // because the pedestal skirt and the dialogue box start close to the picture edge there.
+    const bands = patch ? [[0, 0.70, 1], [0.70, 1, 0.5]] : [[0, 1, 1]];
+    const setup = (cv, left) => {
+      cv.width = Math.max(1, Math.round(L.offsetX * dpr)); cv.height = Math.round(L.renderH * dpr);
+      cv.style.left = `${left}px`; cv.style.top = `${L.offsetY}px`;
+      cv.style.width = `${L.offsetX}px`; cv.style.height = `${L.renderH}px`;
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return ctx;
+    };
+    const cl = setup(cvL, 0), cr = setup(cvR, L.offsetX + L.renderW);
+    for (const [y0, y1, frac] of bands) {
+      const srcW = Math.max(4, Math.round(stripL.width * frac));
+      const tileW = srcW * k;
+      const tiles = Math.ceil(L.offsetX / tileW) + 1;
+      const sy = Math.floor(y0 * stripL.height), sh = Math.ceil((y1 - y0) * stripL.height);
+      const dy = y0 * L.renderH, dh = (y1 - y0) * L.renderH;
+      for (let i = 0; i < tiles; i++) {
+        const flipped = i % 2 === 0;                     // tile 0 is the mirrored strip right next to the seam
+        drawStrip(cl, stripL, 0, sy, srcW, sh, L.offsetX - (i + 1) * tileW, dy, tileW, dh, flipped);
+        drawStrip(cr, stripR, stripR.width - srcW, sy, srcW, sh, L.offsetX * 0 + i * tileW, dy, tileW, dh, flipped);
+      }
     }
   }
 
-  function drawStrip(ctx, img, sx, sw, sh, dx, dy, dw, dh, flip) {
+  function drawStrip(ctx, strip, sx, sy, sw, sh, dx, dy, dw, dh, flip) {
     ctx.save();
     if (flip) {
-      ctx.translate(dx + dw, dy);
+      ctx.translate(dx + dw, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, 0, sw, sh, 0, 0, dw + 0.5, dh);
+      ctx.drawImage(strip, sx, sy, sw, sh, 0, dy, dw + 0.5, dh + 0.5);
     } else {
-      ctx.drawImage(img, sx, 0, sw, sh, dx, dy, dw + 0.5, dh);
+      ctx.drawImage(strip, sx, sy, sw, sh, dx, dy, dw + 0.5, dh + 0.5);
     }
     ctx.restore();
   }
@@ -591,6 +621,13 @@
     });
   }
   warmed.nerd = true;
+  // After the page has settled, fetch both routes' pictures in the background (instead of waiting for the choice screen),
+  // so no screen has to be downloaded while the player is tapping through.
+  function warmAllRoutes() { ["blossom", "sunset"].forEach((r, i) => window.setTimeout(() => warmRoute(r), i * 1500)); }
+  (function () {
+    const go = () => window.setTimeout(warmAllRoutes, 2500);
+    if (document.readyState === "complete") go(); else window.addEventListener("load", go, { once: true });
+  })();
 
   // ---- preload the text / arrow / fx layers ----
   const layerImgs = {};
@@ -629,6 +666,31 @@
 
   // Show image `key`. Fade = new image fades in ON TOP of the old one, so the
   // background never dips through while both are semi-transparent.
+  // Decode the pictures that can come next while the player is reading (large pictures otherwise decode on first paint → hitch).
+  const decodedKeys = new Set();
+  function predecodeNext(cfg) {
+    window.setTimeout(() => {
+      const keys = [];
+      const addStep = (sid) => {
+        const st = sid && STEPS[sid];
+        if (st && st.frames) keys.push(st.frames[0]);
+      };
+      if (cfg.next) addStep(cfg.next);
+      if (cfg.cards) ["L", "R"].forEach((side) => {
+        const c = cfg.cards[side];
+        if (!c) return;
+        if (c.hoverImg) keys.push(c.hoverImg);
+        if (c.go) addStep(c.go.startsWith("@") ? (ST.routeStart || {})[c.go] : c.go);
+      });
+      keys.forEach((k) => {
+        const im = imgByKey[k];
+        if (!k || decodedKeys.has(k) || !im || !im.src || !im.decode) return;
+        decodedKeys.add(k);
+        im.decode().catch(() => decodedKeys.delete(k));
+      });
+    }, 500);
+  }
+
   function storyShow(key, { fade = true, ms = ST.fadeMs } = {}) {
     const target = imgByKey[key];
     if (!target) return;
@@ -1268,6 +1330,7 @@
     }
 
     if (story.textGid && story.textGid !== cfg.text) typerHide({ instant });
+    predecodeNext(cfg);
 
     // gloss steps: the hair shine starts together with the first letters; the step moves on
     // once BOTH the text and the shine are finished

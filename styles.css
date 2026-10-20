@@ -11,7 +11,7 @@
   --shadow: rgba(90, 53, 64, 0.25);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; touch-action: manipulation; }
 
 html, body {
   margin: 0;
@@ -58,7 +58,7 @@ body::before, body::after { content: none; }
     pointer-events: none;
     background:
       radial-gradient(ellipse at 50% 50%, rgba(32,19,25,0.55) 0%, rgba(32,19,25,0.80) 100%),
-      url("assets/ui/pc-bg.webp?v=26") center / cover no-repeat;
+      url("assets/ui/pc-bg.webp?v=27") center / cover no-repeat;
   }
   .app { z-index: 1; }
   /* 선셋 허니 루트(선셋 지나 1 ~ 끝)에서는 금색 새틴으로 천천히 바뀐다 (script.js 의 setPcTheme) */
@@ -68,7 +68,7 @@ body::before, body::after { content: none; }
     pointer-events: none;
     background:
       radial-gradient(ellipse at 50% 50%, rgba(48,32,10,0.52) 0%, rgba(48,32,10,0.78) 100%),
-      url("assets/ui/pc-bg-sun.webp?v=26") center / cover no-repeat;
+      url("assets/ui/pc-bg-sun.webp?v=27") center / cover no-repeat;
     opacity: 0;
     transition: opacity 1.2s ease;
   }
@@ -765,7 +765,7 @@ body::before, body::after { content: none; }
 }
 
 /* mirrored wallpaper behind the image so wide screens don't get black side bars */
-.scene-fill { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; filter: blur(3px); }
+.scene-fill { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; }
 
 /* ---------------- 블라썸 루트: fx sprites, hair gloss ---------------- */
 .story-fx { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; overflow: visible; }
