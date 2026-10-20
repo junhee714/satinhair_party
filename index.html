@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>지나의 파티 준비</title>
 <meta name="description" content="지나를 파티에 보내는 아이템 입히기 게임 프로토타입" />
-<link rel="stylesheet" href="styles.css?v=29" />
+<link rel="stylesheet" href="styles.css?v=30" />
 </head>
 <body>
   <div class="app" id="app">
@@ -27,12 +27,12 @@
     <!-- 새틴 커튼 배경은 <img> (다른 사진 화면과 같은 contain-fit 계산), 그 위 캔버스에 봉투/편지지(intro.js).
          '초대장 받기' 버튼(data-rect="introInvite")은 편지지가 멈추면 같은 자리에서 활성화되고, 누르면 너드 지나 1 로 이어집니다. -->
     <section class="scene photo-scene" id="scene-envelope" data-scene="envelope">
-      <img class="scene-bg" id="introBg" src="assets/intro/curtain.webp?v=29" alt="" data-natural-w="402" data-natural-h="874" draggable="false" />
+      <img class="scene-bg" id="introBg" src="assets/intro/curtain.webp?v=30" alt="" data-natural-w="402" data-natural-h="874" draggable="false" />
       <div class="letter-layer" id="introLayer" data-rect="storyFull">
         <canvas class="letter-canvas" id="introCanvas" width="804" height="1748"></canvas>
       </div>
       <div class="hotspot-layer">
-        <button class="intro-invite-btn" id="btnInvite" data-rect="introInvite" aria-label="초대장 받기"><img src="assets/intro/btn-invite.webp?v=29" alt="초대장 받기" draggable="false" /></button>
+        <button class="intro-invite-btn" id="btnInvite" data-rect="introInvite" aria-label="초대장 받기"><img src="assets/intro/btn-invite.webp?v=30" alt="초대장 받기" draggable="false" /></button>
       </div>
     </section>
 
@@ -75,7 +75,7 @@
 
     <!-- ============ SCENE 3b: 편지 화면 (블라썸 24 → ▶). 배경 이미지(위쪽 아이콘 포함) 위 캔버스에 봉투/편지지 모션, 그 위에 선물받기/다시하기 버튼 ============ -->
     <section class="scene hidden photo-scene" id="scene-letter" data-scene="letter">
-      <img class="scene-bg" id="letterBg" src="assets/scenes/letter-bg.webp?v=29" alt="" data-natural-w="402" data-natural-h="874" draggable="false" />
+      <img class="scene-bg" id="letterBg" src="assets/scenes/letter-bg.webp?v=30" alt="" data-natural-w="402" data-natural-h="874" draggable="false" />
       <div class="letter-layer" id="letterLayer" data-rect="storyFull">
         <canvas class="letter-canvas" id="letterCanvas" width="804" height="1748"></canvas>
       </div>
@@ -85,8 +85,8 @@
         <button class="hotspot" id="letterMute" data-rect="storyMute" aria-label="음악 끄기"></button>
         <button class="hotspot" id="letterUndo" data-rect="storyUndo" aria-label="처음부터 다시"></button>
       </div>
-      <button class="letter-pill" id="letterGift" data-rect="letterGift" aria-label="선물받기"><img src="assets/letter/btn-gift.webp?v=29" alt="선물받기" draggable="false" /></button>
-      <button class="letter-pill" id="letterRetry" data-rect="letterRetry" aria-label="다시하기"><img src="assets/letter/btn-retry.webp?v=29" alt="다시하기" draggable="false" /></button>
+      <button class="letter-pill" id="letterGift" data-rect="letterGift" aria-label="선물받기"><img src="assets/letter/btn-gift.webp?v=30" alt="선물받기" draggable="false" /></button>
+      <button class="letter-pill" id="letterRetry" data-rect="letterRetry" aria-label="다시하기"><img src="assets/letter/btn-retry.webp?v=30" alt="다시하기" draggable="false" /></button>
     </section>
 
     <!-- ============ SCENE 4: styling-tool puzzle (comb vs curler, photo scene) ============ -->
@@ -141,12 +141,12 @@
   </div>
 
 
-  <script src="data.js?v=29"></script>
-  <script src="assets/text/dialogue-map.js?v=29"></script>
-  <script src="assets/fx/fx-map.js?v=29"></script>
-  <script src="assets/fx/fx-map-sun.js?v=29"></script>
-  <script src="letter.js?v=29"></script>
-  <script src="intro.js?v=29"></script>
-  <script src="script.js?v=29"></script>
+  <script src="data.js?v=30"></script>
+  <script src="assets/text/dialogue-map.js?v=30"></script>
+  <script src="assets/fx/fx-map.js?v=30"></script>
+  <script src="assets/fx/fx-map-sun.js?v=30"></script>
+  <script src="letter.js?v=30"></script>
+  <script src="intro.js?v=30"></script>
+  <script src="script.js?v=30"></script>
 </body>
 </html>

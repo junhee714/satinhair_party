@@ -101,6 +101,10 @@
   function drawSideFill(sceneEl, img, L) {
     if (img.tagName !== "IMG") return;
     applyEdgeColors(sceneEl, img);
+    if (img.id === "introBg") {                        // the intro curtain covers the whole screen: no side bars to fill
+      sceneEl.querySelectorAll(":scope > .scene-fill").forEach((c) => { c.style.display = "none"; });
+      return;
+    }
     if (img.dataset.wide && WIDE) {                    // the picture itself already covers the bleed: only fill what is left beyond its edges
       const bleed = WIDE.frameX * (L.renderW / 402);
       L = { ...L, offsetX: Math.max(0, L.offsetX - bleed), renderW: WIDE.canvasW * (L.renderW / 402) };
@@ -192,6 +196,18 @@
       renderW = boxW; renderH = renderW / naturalRatio;
       offsetX = 0; offsetY = (boxH - renderH) / 2;
     }
+    // First screen (envelope intro): the design (402x874) is scaled to the screen WIDTH, like on a 402-wide phone, and centred vertically; the
+    // curtain picture behind it covers the whole screen. If the screen is too short for the envelope + letter, the content is shrunk to fit.
+    if (sceneEl.id === "scene-envelope") {
+      const CT = 170, CH = 590;                                   // design px: top of the letter .. bottom of the envelope
+      const sc = Math.min(boxW / 402, (boxH - 24) / CH);
+      renderW = 402 * sc; renderH = 874 * sc;
+      offsetX = (boxW - renderW) / 2; offsetY = (boxH - renderH) / 2;
+      const bottom = offsetY + (CT + CH) * sc;
+      if (bottom > boxH - 12) offsetY -= bottom - (boxH - 12);
+      const top = offsetY + CT * sc;
+      if (top < 12) offsetY += 12 - top;
+    }
     // Wide-canvas route on a narrow screen: grow the frame a little (cutting at most 3 % of its width on each side) instead of leaving bars above / below.
     if (wideRoute && sceneEl.id === "scene-story") {
       const sC = Math.min(boxW / 402, boxH / 874), sM = boxW / (402 * 0.94);
@@ -222,6 +238,9 @@
       if (el.dataset.fitText) el.style.fontSize = `${r.h * renderH * 0.4}px`;
     });
 
+    if (sceneEl.id === "scene-envelope" && window.IntroScene && window.IntroScene.layout) {
+      window.IntroScene.layout({ sc: renderW / 402, left: offsetX, top: offsetY, boxW, boxH });
+    }
     return { offsetX, offsetY, renderW, renderH };
   }
 
@@ -533,9 +552,13 @@
         fetch(CFG[name].src).then((r) => r.arrayBuffer()).then((ab) => new Promise((ok, no) => ac.decodeAudioData(ab, ok, no))).then((b) => { bufs[name] = b; }).catch(() => {});
       });
     }
-    function play(name, delayMs) {
+    function play(name, delayMs, opts) {
       const c = CFG[name];
       if (!c || Music.muted) return;
+      if (opts && opts.onlyIfRunning) {                              // (e.g. the intro wind: skip instead of playing late when the browser has not unlocked audio yet)
+        const a0 = Music.ctx();
+        if (!a0 || a0.state !== "running" || !bufs[name]) return;
+      }
       const wait = (delayMs != null ? delayMs : c.delayMs) || 0;
       if (wait > 0) { window.setTimeout(() => play(name, -1), wait); return; }
       const ac = Music.ctx();
@@ -592,6 +615,8 @@
     }, SOFT);
   });
 
+  // 첫 화면: 봉투가 날아오기 시작할 때 바람 소리 (오디오가 아직 잠겨 있으면 늦게 틀지 않고 건너뜀 — 아이폰은 화면을 한 번 터치해야 소리가 열려요)
+  window.IntroScene.onStart = () => Sfx.play("wind", 0, { onlyIfRunning: true });
   resetEnvelopeScene();
 
   // ==========================================================================
@@ -656,7 +681,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=29`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=30`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";

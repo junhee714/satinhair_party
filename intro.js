@@ -8,13 +8,15 @@
 */
 (() => {
   "use strict";
-  const DIR = "assets/intro/", VER = "?v=29";
+  const DIR = "assets/intro/", VER = "?v=30";
   const FILES = {
     closed_body: "closed-body.webp", closed_flap: "closed-flap.webp",
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",
     letter: "letter.webp", btn: "btn-invite.webp",
   };
-  const W = 804, H = 1748, S = 2;
+  const W = 804, H = 1748, S = 2;                    // the 402x874 frame, drawn at 2x
+  let EX = 0, EY = 0, CW = W, CH = H;                // extra canvas margin around the frame (canvas px, each side) so nothing is cut off at the frame edge
+  let lastT = -1;
   const cv = document.getElementById("introCanvas"); const ctx = cv.getContext("2d");
   const invite = document.getElementById("btnInvite");
 
@@ -92,7 +94,7 @@
   // frontal fold with perspective: the flap swings about the hinge (y = HING) through the viewer's side;
   // every row of the flap gets its own screen height and width scale (strips).
   const STRIP = 2;
-  const flapCan = document.createElement("canvas"); flapCan.width = W; flapCan.height = H; const flapCtx = flapCan.getContext("2d"); flapCtx.imageSmoothingQuality = "high";
+  const flapCan = document.createElement("canvas"); flapCan.width = CW; flapCan.height = CH; const flapCtx = flapCan.getContext("2d"); flapCtx.imageSmoothingQuality = "high";
   function foldFlap(c, layer, open, phi) {
     const w = layer.width, hh = layer.height;
     const L = open ? LC + (LO - LC) * clamp01((phi - Math.PI / 2) / (Math.PI / 2)) : LC;
@@ -174,11 +176,11 @@
       } else {
         // draw the folding flap on a scratch canvas (same transform), tint it a little as it turns away, then composite once (no strip banding)
         const m = ctx.getTransform();
-        flapCtx.setTransform(1, 0, 0, 1, 0, 0); flapCtx.globalCompositeOperation = "source-over"; flapCtx.clearRect(0, 0, W, H);
+        flapCtx.setTransform(1, 0, 0, 1, 0, 0); flapCtx.globalCompositeOperation = "source-over"; flapCtx.clearRect(0, 0, CW, CH);
         flapCtx.setTransform(m);
         foldFlap(flapCtx, img.closed_flap, false, phi);
         flapCtx.setTransform(1, 0, 0, 1, 0, 0);
-        flapCtx.globalCompositeOperation = "source-atop"; flapCtx.fillStyle = "rgba(120,48,84," + (0.26 * Math.sin(phi)).toFixed(3) + ")"; flapCtx.fillRect(0, 0, W, H);
+        flapCtx.globalCompositeOperation = "source-atop"; flapCtx.fillStyle = "rgba(120,48,84," + (0.26 * Math.sin(phi)).toFixed(3) + ")"; flapCtx.fillRect(0, 0, CW, CH);
         ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(flapCan, 0, 0); ctx.restore();
       }
     }
@@ -188,8 +190,10 @@
   function draw(t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0, 0, CW, CH);
+    lastT = t;
     if (t < FLY0) return;
+    ctx.setTransform(1, 0, 0, 1, EX, EY);                  // everything below is drawn in frame coordinates
     const p = pose(t);
     const u = clamp01((t - FLY0) / FLY);
     const speed = Math.max(0, 1 - Math.pow(u, 0.55));
@@ -215,7 +219,7 @@
     }))).then(() => { if (img.open_interior && img.open_flap) makeShade(); ctx.imageSmoothingQuality = "high"; });
     return ready;
   }
-  function stop() { token++; cancelAnimationFrame(raf); clearTimeout(pulseTimer); }
+  function stop() { token++; cancelAnimationFrame(raf); raf = 0; clearTimeout(pulseTimer); }
   function hideButton() { btnLive = false; invite.classList.remove("show", "pulse"); }
   function showButton(pulseNow) {
     btnLive = true;
@@ -228,15 +232,16 @@
     const my = token;
     preload().then(() => {
       if (my !== token) return;
-      if (!img.open_panels) { ctx.clearRect(0, 0, W, H); showButton(true); return; }   // art failed to load: never block the game
+      if (!img.open_panels) { ctx.clearRect(0, 0, CW, CH); showButton(true); return; }   // art failed to load: never block the game
       const t0 = performance.now();
+      if (api.onStart) api.onStart();                      // (the game plays the wind sound here)
       let shown = false;
       const tick = (now) => {
         if (my !== token) return;
         const t = now - t0;
         if (!shown && t >= LET0 + LET) { shown = true; showButton(false); }           // letter stopped: the real button takes over in the same frame (same spot, same pixels)
         draw(Math.min(t, TOTAL));
-        if (t < TOTAL) raf = requestAnimationFrame(tick);
+        if (t < TOTAL) raf = requestAnimationFrame(tick); else raf = 0;
       };
       raf = requestAnimationFrame(tick);
     });
@@ -248,9 +253,26 @@
     preload().then(() => {
       if (my !== token) return;
       showButton(true);
-      if (img.open_panels) draw(TOTAL); else ctx.clearRect(0, 0, W, H);
+      if (img.open_panels) draw(TOTAL); else ctx.clearRect(0, 0, CW, CH);
     });
   }
-  window.IntroScene = { play, showEnd, stop, preload };
+  // Called by script.js whenever the scene is laid out: sc = css px per design px, left/top = where the 402x874 frame sits in the scene.
+  // The canvas is made big enough to reach the scene edges, so the envelope flies in from the real screen edge instead of being cut at the frame.
+  const layerEl = document.getElementById("introLayer");
+  function layout(o) {
+    const exd = Math.min(260, Math.max(0, Math.ceil(o.left / o.sc) + 2)), eyd = Math.min(260, Math.max(0, Math.ceil(o.top / o.sc) + 2));
+    const nex = exd * S, ney = eyd * S;
+    layerEl.style.left = "0px"; layerEl.style.top = "0px"; layerEl.style.width = `${o.boxW}px`; layerEl.style.height = `${o.boxH}px`;
+    cv.style.left = `${o.left - exd * o.sc}px`; cv.style.top = `${o.top - eyd * o.sc}px`;
+    cv.style.width = `${(402 + 2 * exd) * o.sc}px`; cv.style.height = `${(874 + 2 * eyd) * o.sc}px`;
+    if (nex !== EX || ney !== EY) {
+      EX = nex; EY = ney; CW = W + 2 * EX; CH = H + 2 * EY;
+      cv.width = CW; cv.height = CH; flapCan.width = CW; flapCan.height = CH;
+      ctx.imageSmoothingQuality = "high";
+      if (img.open_panels && lastT >= 0 && !raf) draw(lastT);
+    }
+  }
+  const api = { play, showEnd, stop, preload, layout, onStart: null };
+  window.IntroScene = api;
   preload();
 })();
