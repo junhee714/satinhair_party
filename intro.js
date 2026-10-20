@@ -8,7 +8,7 @@
 */
 (() => {
   "use strict";
-  const DIR = "assets/intro/", VER = "?v=28";
+  const DIR = "assets/intro/", VER = "?v=29";
   const FILES = {
     closed_body: "closed-body.webp", closed_flap: "closed-flap.webp",
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",

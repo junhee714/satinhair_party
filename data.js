@@ -45,19 +45,19 @@ window.GAME_DATA = {
   //   fadeInMs / fadeOutMs : 페이드 시간(ms).  story.fadeOutMs 는 마지막 화면(선물받기/다시하기)에 들어갈 때의 페이드아웃,
   //   switchFadeMs : 다른 곡으로 넘어가며 이전 곡이 사라지는 시간 (뒤로 가기 등)
   music: {
-    intro: { src: "assets/audio/intro-bgm.mp3?v=28", volume: 0.7, fadeInMs: 2000, fadeOutMs: 1200 },
-    story: { src: "assets/audio/story-bgm.mp3?v=28", volume: 0.7, fadeInMs: 2500, fadeOutMs: 4500 },
+    intro: { src: "assets/audio/intro-bgm.mp3?v=29", volume: 0.7, fadeInMs: 2000, fadeOutMs: 1200 },
+    story: { src: "assets/audio/story-bgm.mp3?v=29", volume: 0.7, fadeInMs: 2500, fadeOutMs: 4500 },
     switchFadeMs: 900,
   // 효과음 (♪ 음악 끄기 상태에서는 함께 꺼집니다).  volume 0~1, 파일은 assets/audio/sfx/
   //   click: 너드 지나부터 모든 버튼   magic: 루트 선택(블라썸1/선셋1) · 변신(11, 18)   comb: 꼬리빗 선택
   //   shine: 커튼이 닫혔다 열릴 때(커튼 속도에 맞춰 1.9초)   wind: 편지 화면에서 초대장이 날아올 때(날아오는 속도에 맞춘 바람)
   sfx: {
-    click: { src: "assets/audio/sfx/click.mp3?v=28", volume: 0.6 },
-    magic: { src: "assets/audio/sfx/magic.mp3?v=28", volume: 0.8 },
-    comb:  { src: "assets/audio/sfx/comb.mp3?v=28",  volume: 0.9 },
-    shine: { src: "assets/audio/sfx/shine.mp3?v=28", volume: 0.8 },
-    wind:  { src: "assets/audio/sfx/wind.mp3?v=28",  volume: 1.0, delayMs: 100 },   // delayMs: 편지 화면의 흰 페이드가 걷히며 날아오는 모습이 보이는 시점에 맞춤
-    glow:  { src: "assets/audio/sfx/glow.mp3?v=28",  volume: 0.8 },                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
+    click: { src: "assets/audio/sfx/click.mp3?v=29", volume: 0.6 },
+    magic: { src: "assets/audio/sfx/magic.mp3?v=29", volume: 0.8 },
+    comb:  { src: "assets/audio/sfx/comb.mp3?v=29",  volume: 0.9 },
+    shine: { src: "assets/audio/sfx/shine.mp3?v=29", volume: 0.8 },
+    wind:  { src: "assets/audio/sfx/wind.mp3?v=29",  volume: 1.0, delayMs: 100 },   // delayMs: 편지 화면의 흰 페이드가 걷히며 날아오는 모습이 보이는 시점에 맞춤
+    glow:  { src: "assets/audio/sfx/glow.mp3?v=29",  volume: 0.8 },                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
   },
   crossFadeMs: 1800,          // "초대장 받기" → 너드 지나: 첫 곡이 사라지는 시간 (두 번째 곡 페이드인과 겹침)
   },
@@ -100,9 +100,19 @@ window.GAME_DATA = {
       "sn-1", "sn-2", "sn-3", "sn-4", "sn-5", "sn-8a", "sn-8b", "sn-9", "sn-10", "sn-fill",   // 선셋 허니 루트
       "sn-12", "sn-13", "sn-15", "sn-16", "sn-18c", "sn-19", "sn-20", "sn-21", "sn-22", "sn-23", "sn-24",   // 선셋 11~24
     ],
+    // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
+    //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
+    wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
-      nerd:    { prefix: "nerd", fill: "nerd-1", mute: "assets/scenes/mute-on-patch.png" },
+      // nerd: 넓은 그림(와이드 캔버스)을 쓰는 루트. rects = 이 루트에서만 쓰는 버튼/카드 위치 (402x874 기준 0~1 비율; 위의 HOTSPOT_RECTS 를 덮어씀)
+      nerd:    { prefix: "nerd", fill: "nerd-1", wide: true, mute: "assets/scenes/mute-on-patch-nerd.png?v=29",
+                 rects: { storyBack: { x: -0.002908, y: 0.059857, w: 0.121175, h: 0.054091 },
+                          storyMute: { x: 0.152292, y: 0.059857, w: 0.120578, h: 0.054091 },
+                          storyUndo: { x: 0.303911, y: 0.059857, w: 0.120578, h: 0.054091 },
+                          storyMutePatch: { x: 0.152292, y: 0.059857, w: 0.120578, h: 0.054091 },
+                          storyCardL: { x: 0.165425, y: 0.75453, w: 0.327114, h: 0.221307 },
+                          storyCardR: { x: 0.506268, y: 0.754256, w: 0.3104, h: 0.221582 } } },
       blossom: { prefix: "bl",   fill: "bl-3",   mute: "assets/scenes/mute-on-patch-pink.png" },
       party:   { prefix: "bl",   fill: "bl-12",  mute: "assets/scenes/mute-on-patch-pink.png" },   // 블썸 11~20 (드레스룸)
       sunset:  { prefix: "sn",   fill: "sn-fill",   mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 허니 루트

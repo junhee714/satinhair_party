@@ -36,6 +36,11 @@
 
   const photoScenes = Array.from(document.querySelectorAll(".photo-scene"));
 
+  // Routes whose pictures have a different layout (e.g. the wide nerd pictures) override some click-zone rects (data.js: routes.<name>.rects).
+  let rectOverride = null, wideRoute = false;
+  const rectOf = (sceneEl, key) => (rectOverride && sceneEl && sceneEl.id === "scene-story" && rectOverride[key]) || RECTS[key];
+  const WIDE = (window.GAME_DATA && window.GAME_DATA.story && window.GAME_DATA.story.wide) || null;   // wide-canvas pictures (bleed on both sides)
+
   // --------------------------------------------------------------------------
   // SIDE FILL: on screens wider than 402:874 (e.g. phones with a browser bar)
   // the image can't cover the full width without cropping the top/bottom, so
@@ -83,7 +88,7 @@
       if (!img._edge) {
         const plain = img.id === "introBg";          // (the curtain picture has no corner ornaments)
         img._edge = {
-          top: plain ? avgColor(img, 0, 0, 1, 0.02) : avgColor(img, 0, 0.10, 1, 0.12),
+          top: plain ? avgColor(img, 0, 0, 1, 0.02) : img.dataset.wide ? avgColor(img, 0, 0.125, 1, 0.145) : avgColor(img, 0, 0.10, 1, 0.12),
           bottom: avgColor(img, 0.3, 0.975, 0.7, 0.995),
         };
       }
@@ -96,6 +101,10 @@
   function drawSideFill(sceneEl, img, L) {
     if (img.tagName !== "IMG") return;
     applyEdgeColors(sceneEl, img);
+    if (img.dataset.wide && WIDE) {                    // the picture itself already covers the bleed: only fill what is left beyond its edges
+      const bleed = WIDE.frameX * (L.renderW / 402);
+      L = { ...L, offsetX: Math.max(0, L.offsetX - bleed), renderW: WIDE.canvasW * (L.renderW / 402) };
+    }
     const old = sceneEl.querySelector(":scope > canvas.scene-fill:not(.fill-l):not(.fill-r)");
     if (old) old.remove();
     let cvL = sceneEl.querySelector(":scope > .scene-fill.fill-l"), cvR = sceneEl.querySelector(":scope > .scene-fill.fill-r");
@@ -183,10 +192,27 @@
       renderW = boxW; renderH = renderW / naturalRatio;
       offsetX = 0; offsetY = (boxH - renderH) / 2;
     }
+    // Wide-canvas route on a narrow screen: grow the frame a little (cutting at most 3 % of its width on each side) instead of leaving bars above / below.
+    if (wideRoute && sceneEl.id === "scene-story") {
+      const sC = Math.min(boxW / 402, boxH / 874), sM = boxW / (402 * 0.94);
+      const sw = Math.max(sC, Math.min(boxH / 874, sM));
+      renderW = 402 * sw; renderH = 874 * sw;
+      offsetX = (boxW - renderW) / 2; offsetY = (boxH - renderH) / 2;
+    }
+    // Wide-canvas pictures: the 402x874 frame is fitted as before; the extra background around it is shown out to the screen edges.
+    if (WIDE) {
+      const s = renderW / 402;
+      sceneEl.querySelectorAll(".scene-bg[data-wide]").forEach((im) => {
+        im.style.right = "auto"; im.style.bottom = "auto";
+        im.style.left = `${offsetX - WIDE.frameX * s}px`; im.style.top = `${offsetY}px`;
+        im.style.width = `${WIDE.canvasW * s}px`; im.style.height = `${renderH}px`;
+        im.style.objectFit = "fill";
+      });
+    }
     drawSideFill(sceneEl, fillImg, { offsetX, offsetY, renderW, renderH, boxW, boxH });
 
     sceneEl.querySelectorAll("[data-rect]").forEach((el) => {
-      const r = RECTS[el.dataset.rect];
+      const r = rectOf(sceneEl, el.dataset.rect);
       if (!r) return;
       el.style.left = `${offsetX + r.x * renderW}px`;
       el.style.top = `${offsetY + r.y * renderH}px`;
@@ -216,7 +242,7 @@
   function positionOnRect(sceneEl, el, rectKey) {
     const layout = layoutPhotoScene(sceneEl);
     if (!layout) return;
-    const r = RECTS[rectKey];
+    const r = rectOf(sceneEl, rectKey);
     el.style.left = `${layout.offsetX + r.x * layout.renderW}px`;
     el.style.top = `${layout.offsetY + r.y * layout.renderH}px`;
     el.style.width = `${r.w * layout.renderW}px`;
@@ -630,12 +656,13 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=29`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
     im.alt = ""; im.draggable = false; im.decoding = "async";
-    im.dataset.key = key; im.dataset.naturalW = "402"; im.dataset.naturalH = "874";
+    im.dataset.key = key; im.dataset.naturalW = "402"; im.dataset.naturalH = "874";   // (= the 402x874 frame; wide pictures extend beyond it)
+    if (WIDE && WIDE.keys.indexOf(key) >= 0) im.dataset.wide = "1";
     sceneStory.insertBefore(im, glossLayer);
     imgByKey[key] = im;
     if (key.startsWith("nerd")) im.src = imgSrc(key);       // blossom images are fetched a bit later (warmRoute)
@@ -754,6 +781,8 @@
     sceneStory._fillImg = imgByKey[R.fill];
     if (window.LetterScene && (route === "hall" || route === "shall")) window.LetterScene.preload(route === "shall" ? "sunset" : "blossom");   // the letter screen comes after 24
     mutePatch.src = R.mute;
+    rectOverride = R.rects || null;
+    wideRoute = !!R.wide;
     layoutPhotoScene(sceneStory);
   }
   function refillSides() { layoutPhotoScene(sceneStory); }
