@@ -1,0 +1,1838 @@
+(() => {
+  "use strict";
+
+  const app = document.getElementById("app");
+  const D = window.GAME_DATA;
+  const RECTS = window.HOTSPOT_RECTS;
+
+  const state = {
+    route: null,
+    stylePicked: null,
+    accessoryPicked: new Set(),
+    history: [],
+    muted: false,
+  };
+
+  function currentSceneId() {
+    const visible = document.querySelector(".scene:not(.hidden)");
+    return visible ? visible.dataset.scene : null;
+  }
+
+  function currentRoute() {
+    return D.routes[state.route] || D.routes.blossom;
+  }
+
+  // ==========================================================================
+  // GENERIC PHOTO-SCENE HOTSPOT LAYOUT
+  // ==========================================================================
+  //
+  // Every photo scene = one full 402x874 composite image (<img class=
+  // "scene-bg">) shown with object-fit:contain, plus a set of invisible
+  // buttons (.hotspot[data-rect]) that this function positions in exact
+  // pixels over the corresponding fraction of the ORIGINAL image — so they
+  // always sit precisely on the baked-in cards/icons regardless of screen
+  // size (see HOTSPOT_RECTS in data.js for how those fractions were
+  // measured).
+
+  const photoScenes = Array.from(document.querySelectorAll(".photo-scene"));
+
+  // --------------------------------------------------------------------------
+  // SIDE FILL: on screens wider than 402:874 (e.g. phones with a browser bar)
+  // the image can't cover the full width without cropping the top/bottom, so
+  // the left/right bars used to be black. Instead, the outermost strip of the
+  // image (wallpaper / baseboard / floor only — no ornaments, no character) is
+  // mirrored outward again and again, so the wallpaper simply keeps going.
+  // The mirror makes the seam invisible.
+  // --------------------------------------------------------------------------
+  const SIDE_STRIP = 0.058;   // fraction of image width used as the repeating strip (the part of the wallpaper left of the dialogue box / icons)
+
+  // A clean wallpaper strip taken from the left / right edge of the picture. The corner ornaments (top ≈ 0–9.5 %, bottom ≈ 89.5–100 %)
+  // are painted over with wallpaper rows from just below / above, so no ornament pieces get mirrored into the side bars.
+  function sideStrip(img, right, patch) {
+    const key = [img.currentSrc, right, patch].join("|");
+    if (img._strips && img._strips[key]) return img._strips[key];
+    const nw = img.naturalWidth, nh = img.naturalHeight, sw = Math.max(8, Math.round(nw * SIDE_STRIP));
+    const cv = document.createElement("canvas");
+    cv.width = sw; cv.height = nh;
+    const c = cv.getContext("2d");
+    const sx = right ? nw - sw : 0;
+    c.drawImage(img, sx, 0, sw, nh, 0, 0, sw, nh);
+    if (patch) {
+      const t = Math.round(nh * 0.095), b = Math.round(nh * 0.895), hb = nh - b;
+      c.drawImage(img, sx, t, sw, t, 0, 0, sw, t);
+    }
+    (img._strips = img._strips || {})[key] = cv;
+    return cv;
+  }
+
+  // Side bars are two small canvases (just the bars, not the whole screen) → much less memory / redraw work than a full-screen canvas.
+  function drawSideFill(sceneEl, img, L) {
+    if (img.tagName !== "IMG") return;
+    const old = sceneEl.querySelector(":scope > canvas.scene-fill:not(.fill-l):not(.fill-r)");
+    if (old) old.remove();
+    let cvL = sceneEl.querySelector(":scope > .scene-fill.fill-l"), cvR = sceneEl.querySelector(":scope > .scene-fill.fill-r");
+    if (L.offsetX < 1 || L.offsetY > 1) {              // no side bars (or top/bottom bars): nothing to fill
+      if (cvL) cvL.style.display = "none";
+      if (cvR) cvR.style.display = "none";
+      return;
+    }
+    if (!img.complete || !img.naturalWidth) {
+      if (!img._fillWait) { img._fillWait = true; img.addEventListener("load", () => { img._fillWait = false; layoutPhotoScene(sceneEl); }, { once: true }); }
+      return;
+    }
+    if (!cvL) {
+      cvL = document.createElement("canvas"); cvL.className = "scene-fill fill-l";
+      cvR = document.createElement("canvas"); cvR.className = "scene-fill fill-r";
+      sceneEl.insertBefore(cvR, sceneEl.firstChild); sceneEl.insertBefore(cvL, sceneEl.firstChild);
+    }
+    const patch = img.id !== "introBg";                  // (the intro curtain picture has no corner ornaments)
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const key = [L.boxW, L.boxH, L.offsetX, L.renderW, dpr, img.currentSrc].join("|");
+    cvL.style.display = cvR.style.display = "block";
+    if (cvL._key === key) return;
+    cvL._key = key;
+    const nw = img.naturalWidth;
+    const k = L.renderW / nw;                            // css px per image px
+    const stripL = sideStrip(img, false, patch), stripR = sideStrip(img, true, patch);
+    // Two bands: the wallpaper (top) can use a wide strip; the lower part (baseboard / floor) must use a narrower one,
+    // because the pedestal skirt and the dialogue box start close to the picture edge there.
+    const bands = patch ? [[0, 0.70, 1], [0.70, 1, 0.5]] : [[0, 1, 1]];
+    const setup = (cv, left) => {
+      cv.width = Math.max(1, Math.round(L.offsetX * dpr)); cv.height = Math.round(L.renderH * dpr);
+      cv.style.left = `${left}px`; cv.style.top = `${L.offsetY}px`;
+      cv.style.width = `${L.offsetX}px`; cv.style.height = `${L.renderH}px`;
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return ctx;
+    };
+    const cl = setup(cvL, 0), cr = setup(cvR, L.offsetX + L.renderW);
+    for (const [y0, y1, frac] of bands) {
+      const srcW = Math.max(4, Math.round(stripL.width * frac));
+      const tileW = srcW * k;
+      const tiles = Math.ceil(L.offsetX / tileW) + 1;
+      const sy = Math.floor(y0 * stripL.height), sh = Math.ceil((y1 - y0) * stripL.height);
+      const dy = y0 * L.renderH, dh = (y1 - y0) * L.renderH;
+      for (let i = 0; i < tiles; i++) {
+        const flipped = i % 2 === 0;                     // tile 0 is the mirrored strip right next to the seam
+        drawStrip(cl, stripL, 0, sy, srcW, sh, L.offsetX - (i + 1) * tileW, dy, tileW, dh, flipped);
+        drawStrip(cr, stripR, stripR.width - srcW, sy, srcW, sh, L.offsetX * 0 + i * tileW, dy, tileW, dh, flipped);
+      }
+    }
+  }
+
+  function drawStrip(ctx, strip, sx, sy, sw, sh, dx, dy, dw, dh, flip) {
+    ctx.save();
+    if (flip) {
+      ctx.translate(dx + dw, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(strip, sx, sy, sw, sh, 0, dy, dw + 0.5, dh + 0.5);
+    } else {
+      ctx.drawImage(strip, sx, sy, sw, sh, dx, dy, dw + 0.5, dh + 0.5);
+    }
+    ctx.restore();
+  }
+
+  function layoutPhotoScene(sceneEl) {
+    const img = sceneEl.querySelector(".scene-bg");
+    if (!img) return;
+    const fillImg = sceneEl._fillImg || img;        // story scene: wallpaper source differs per route
+    const naturalW = Number(img.dataset.naturalW) || img.naturalWidth;
+    const naturalH = Number(img.dataset.naturalH) || img.naturalHeight;
+    if (!naturalW || !naturalH) return;
+
+    const boxW = sceneEl.clientWidth;
+    const boxH = sceneEl.clientHeight;
+    if (!boxW || !boxH) return;
+
+    const naturalRatio = naturalW / naturalH;
+    const boxRatio = boxW / boxH;
+    let renderW, renderH, offsetX, offsetY;
+    if (boxRatio > naturalRatio) {
+      renderH = boxH; renderW = renderH * naturalRatio;
+      offsetX = (boxW - renderW) / 2; offsetY = 0;
+    } else {
+      renderW = boxW; renderH = renderW / naturalRatio;
+      offsetX = 0; offsetY = (boxH - renderH) / 2;
+    }
+    drawSideFill(sceneEl, fillImg, { offsetX, offsetY, renderW, renderH, boxW, boxH });
+
+    sceneEl.querySelectorAll("[data-rect]").forEach((el) => {
+      const r = RECTS[el.dataset.rect];
+      if (!r) return;
+      el.style.left = `${offsetX + r.x * renderW}px`;
+      el.style.top = `${offsetY + r.y * renderH}px`;
+      el.style.width = `${r.w * renderW}px`;
+      el.style.height = `${r.h * renderH}px`;
+      // Buttons that draw their own label scale the font with their box.
+      if (el.dataset.fitText) el.style.fontSize = `${r.h * renderH * 0.4}px`;
+    });
+
+    return { offsetX, offsetY, renderW, renderH };
+  }
+
+  function layoutAllPhotoScenes() {
+    photoScenes.forEach(layoutPhotoScene);
+  }
+
+  function setSceneImage(sceneEl, src) {
+    const img = sceneEl.querySelector(".scene-bg");
+    if (img.src.endsWith(src)) { layoutPhotoScene(sceneEl); return; }
+    img.onload = () => layoutPhotoScene(sceneEl);
+    img.src = src;
+  }
+
+  // Places a decorative/fx element (card tint, correct ring, notice popup)
+  // using the same fractional rects as the hotspots, so it lines up with
+  // the baked-in card exactly.
+  function positionOnRect(sceneEl, el, rectKey) {
+    const layout = layoutPhotoScene(sceneEl);
+    if (!layout) return;
+    const r = RECTS[rectKey];
+    el.style.left = `${layout.offsetX + r.x * layout.renderW}px`;
+    el.style.top = `${layout.offsetY + r.y * layout.renderH}px`;
+    el.style.width = `${r.w * layout.renderW}px`;
+    el.style.height = `${r.h * layout.renderH}px`;
+  }
+
+  window.addEventListener("resize", layoutAllPhotoScenes);
+  window.addEventListener("orientationchange", layoutAllPhotoScenes);
+  if (window.ResizeObserver) {
+    photoScenes.forEach((s) => new ResizeObserver(() => layoutPhotoScene(s)).observe(s));
+  }
+
+  // ==========================================================================
+  // TRANSITIONS
+  // ==========================================================================
+
+  const overlay = document.getElementById("transitionOverlay");
+  // white veil between screens: color / peak opacity / speed live in data.js (transition)
+  overlay.style.setProperty("--veil-color", D.transition.color);
+  overlay.style.setProperty("--veil-peak", D.transition.peak);
+  overlay.style.setProperty("--veil-in", `${D.transition.inMs}ms`);
+  overlay.style.setProperty("--veil-out", `${D.transition.outMs}ms`);
+
+  function transitionTo(nextSceneId, setupFn, soft) {
+    const T = soft || { peak: D.transition.peak, inMs: D.transition.inMs, holdMs: 0, outMs: D.transition.outMs };
+    overlay.style.setProperty("--veil-peak", T.peak);
+    overlay.style.setProperty("--veil-in", `${T.inMs}ms`);
+    overlay.style.setProperty("--veil-out", `${T.outMs}ms`);
+    overlay.style.setProperty("--veil-ease", soft ? "ease-in-out" : "");
+    overlay.classList.add("cover");
+    window.setTimeout(() => {
+      const prevId = currentSceneId();
+      if (prevId && prevId !== nextSceneId) state.history.push(prevId);
+      showSceneRaw(nextSceneId);
+      if (typeof setupFn === "function") setupFn();
+      overlay.classList.remove("cover");
+      if (soft) window.setTimeout(() => {
+        overlay.style.setProperty("--veil-peak", D.transition.peak);
+        overlay.style.setProperty("--veil-in", `${D.transition.inMs}ms`);
+        overlay.style.setProperty("--veil-out", `${D.transition.outMs}ms`);
+        overlay.style.setProperty("--veil-ease", "");
+      }, T.outMs + 50);
+    }, T.inMs + (T.holdMs || 0));
+  }
+
+  // Scenes with their own baked-in control icons (route, style, ...) hide
+  // the generic CSS control bar; scenes that are still plain-color
+  // placeholders (accessory, curtain, ending) show it instead.
+  const SCENES_WITH_BAKED_CONTROLS = new Set(["story", "style", "letter"]);
+  const SCENES_WITH_GENERIC_CONTROLS = new Set(["accessory", "curtain", "ending"]);
+
+  // PC 배경(분홍/금색 새틴)은 CSS(body::before / body::after)에 있고, 여기서는 클래스만 바꾼다. 모바일에서는 보이지 않는다.
+  function setPcTheme(sun) { document.body.classList.toggle("sun-bg", !!sun); }
+
+  function showSceneRaw(id) {
+    document.querySelectorAll(".scene").forEach((el) => {
+      el.classList.toggle("hidden", el.dataset.scene !== id);
+    });
+    document.getElementById("controlBar").classList.toggle("hidden", !SCENES_WITH_GENERIC_CONTROLS.has(id));
+    if (id !== "envelope" && window.IntroScene) window.IntroScene.stop();
+    if (id === "envelope") setPcTheme(false);          // 첫 화면으로 돌아오면 PC 배경도 분홍으로
+    if (SCENES_WITH_BAKED_CONTROLS.has(id) || id === "envelope") {
+      requestAnimationFrame(() => layoutAllPhotoScenes());
+    }
+  }
+
+  // ==========================================================================
+  // SHARED TOAST / FX HELPERS
+  // ==========================================================================
+
+  const globalToast = document.getElementById("globalToast");
+  const globalToastText = document.getElementById("globalToastText");
+  let toastTimer = null;
+
+  function showToast(text, ms = 2400, pos = "bottom") {
+    globalToastText.textContent = text;
+    globalToast.classList.toggle("top", pos === "top");
+    globalToast.classList.add("show");
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => globalToast.classList.remove("show"), ms);
+  }
+
+  function showBubble(bubbleEl, textEl, text, { autoHideMs } = {}) {
+    textEl.textContent = text;
+    bubbleEl.classList.add("show");
+    if (autoHideMs) {
+      window.clearTimeout(bubbleEl._hideTimer);
+      bubbleEl._hideTimer = window.setTimeout(() => hideBubble(bubbleEl), autoHideMs);
+    }
+  }
+  function hideBubble(bubbleEl) { bubbleEl.classList.remove("show"); }
+
+  // ==========================================================================
+  // TIMED GIF / MP4 OVERLAY (unchanged capability, ready to use anywhere)
+  // ==========================================================================
+
+  const mediaOverlay = document.getElementById("timedMediaOverlay");
+  const mediaVideo = document.getElementById("timedVideo");
+  const mediaGif = document.getElementById("timedGif");
+
+  function showTimedMedia({ type, src, delayAfterEndMs = 3000, fixedDelayMs = null }) {
+    return new Promise((resolve) => {
+      mediaOverlay.classList.remove("hidden");
+      requestAnimationFrame(() => mediaOverlay.classList.add("show"));
+      const finish = () => {
+        mediaOverlay.classList.remove("show");
+        window.setTimeout(() => {
+          mediaOverlay.classList.add("hidden");
+          mediaVideo.pause();
+          mediaVideo.removeAttribute("src");
+          mediaVideo.classList.add("hidden");
+          mediaGif.removeAttribute("src");
+          mediaGif.classList.add("hidden");
+          resolve();
+        }, 350);
+      };
+      if (type === "video") {
+        mediaGif.classList.add("hidden");
+        mediaVideo.classList.remove("hidden");
+        mediaVideo.src = src;
+        mediaVideo.currentTime = 0;
+        mediaVideo.play().catch(() => {});
+        if (fixedDelayMs) window.setTimeout(finish, fixedDelayMs);
+        else mediaVideo.onended = () => window.setTimeout(finish, delayAfterEndMs);
+      } else {
+        mediaVideo.classList.add("hidden");
+        mediaGif.classList.remove("hidden");
+        mediaGif.src = src;
+        window.setTimeout(finish, fixedDelayMs || delayAfterEndMs);
+      }
+    });
+  }
+  window.PartyGame = window.PartyGame || {};
+  window.PartyGame.showTimedMedia = showTimedMedia;
+
+  // ---- background music: 두 곡 (intro = 첫 화면, story = 너드 지나 ~ 편지 화면 직전), 페이드 인/아웃, ♪ 버튼으로 끄고 켬 ----
+  // 소리 크기 변화는 WebAudio GainNode 로 한다 (iOS 사파리는 audio.volume 을 무시하기 때문). WebAudio 가 없으면 audio.volume 으로 대신한다.
+  // 브라우저는 사용자가 한 번 터치하기 전에는 소리를 못 내므로, 첫 터치에서 두 곡을 모두 "잠금 해제"해 두고 그때부터 재생한다.
+  const Music = (() => {
+    const CFG = D.music;
+    // 주의: 파일(file://)로 직접 열면 브라우저가 WebAudio 로 흘려보낸 소리를 무음 처리한다 → 그때는 audio.volume 으로 페이드한다.
+    //       (배포 주소 http/https 에서는 WebAudio 사용: iOS 사파리도 페이드가 먹는다)
+    const AC = /^https?:$/.test(location.protocol) ? (window.AudioContext || window.webkitAudioContext) : null;
+    let ac = null, ticker = 0, desired = null, muted = false;
+    const T = {};
+    const clamp01 = (x) => Math.max(0, Math.min(1, x));
+    function ensureCtx() {
+      if (!ac && AC) {
+        try {
+          ac = new AC();
+          // 자동 재생이 허용돼서 컨텍스트가 늦게 켜지면, 페이드 인을 처음부터 다시 시작
+          ac.addEventListener("statechange", () => {
+            if (ac.state === "running" && desired && !muted) { const t = T[desired.name]; if (t) { setVol(t, 0); startEl(t, desired.fadeInMs, false); } }
+          });
+        } catch (e) { ac = null; }
+      }
+      return ac;
+    }
+    // 소리 크기 설정. 페이드는 WebAudio 사용 시 오디오 스레드에 "예약"해서 한다 →
+    // 화면 전환 중 메인 스레드가 잠깐 멈춰도 소리가 뚝 끊기거나 튀지 않는다.
+    function setVol(t, v, keepSched) {
+      t.v = clamp01(v);
+      if (t.gain) { if (!keepSched) { try { t.gain.gain.cancelScheduledValues(0); } catch (e) {} t.gain.gain.value = t.v; } }
+      else t.el.volume = t.v;
+    }
+    const EASE = (() => { const n = 48, a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = 0.5 - 0.5 * Math.cos(Math.PI * i / (n - 1)); return a; })();
+    function schedule(t, from, to, ms) {
+      const g = t.gain.gain, now = ac.currentTime;
+      try {
+        g.cancelScheduledValues(0);
+        g.setValueAtTime(from, now);
+        if (ms > 0 && from !== to) {
+          const c = new Float32Array(EASE.length);
+          for (let i = 0; i < c.length; i++) c[i] = from + (to - from) * EASE[i];
+          g.setValueCurveAtTime(c, now + 0.01, ms / 1000);
+        } else g.setValueAtTime(to, now);
+      } catch (e) { g.value = to; }
+    }
+    function make(name) {
+      if (T[name]) return T[name];
+      const c = CFG[name], el = new Audio();
+      el.loop = true; el.preload = "auto"; el.setAttribute("playsinline", ""); el.src = c.src;
+      const t = { name, el, gain: null, v: 0, ramp: null, blocked: false, broken: false };
+      el.addEventListener("error", () => { t.broken = true; });
+      if (ensureCtx()) {
+        try {
+          const src = ac.createMediaElementSource(el);
+          t.gain = ac.createGain(); t.gain.gain.value = 0;
+          src.connect(t.gain); t.gain.connect(ac.destination);
+        } catch (e) { t.gain = null; }
+      }
+      setVol(t, 0);
+      T[name] = t;
+      return t;
+    }
+    function tick() {
+      const now = performance.now();
+      let any = false;
+      Object.values(T).forEach((t) => {
+        const r = t.ramp; if (!r) return;
+        const u = r.ms <= 0 ? 1 : clamp01((now - r.t0) / r.ms);
+        const e = 0.5 - 0.5 * Math.cos(Math.PI * u);                 // smooth in and out
+        setVol(t, r.from + (r.to - r.from) * e, !!t.gain);           // (WebAudio 는 이미 예약돼 있으니 값만 기록)
+        if (u >= 1) { t.ramp = null; if (r.then) r.then(); } else any = true;
+      });
+      if (!any) { window.clearInterval(ticker); ticker = 0; }
+    }
+    function valueNow(t) {                                          // 진행 중인 페이드의 "지금 값" (메인 스레드가 밀렸어도 시간으로 계산)
+      const r = t.ramp; if (!r) return t.v;
+      const u = r.ms <= 0 ? 1 : clamp01((performance.now() - r.t0) / r.ms);
+      return r.from + (r.to - r.from) * (0.5 - 0.5 * Math.cos(Math.PI * u));
+    }
+    function ramp(t, to, ms, then) {
+      const from = valueNow(t);
+      t.v = from;
+      t.ramp = { from, to, t0: performance.now(), ms, then };
+      if (t.gain && ac) schedule(t, from, to, ms);
+      if (!ticker) ticker = window.setInterval(tick, 30);
+      tick();
+    }
+    function startEl(t, fadeMs, restart) {
+      if (t.broken) return;
+      if (restart) { try { t.el.currentTime = 0; } catch (e) {} }
+      const p = t.el.play();
+      if (p && typeof p.catch === "function") p.catch(() => { t.blocked = true; ramp(t, 0, 0); });
+      else if (p && typeof p.then === "function") p.then(() => { t.unlocked = true; if (ac && ac.state === "suspended") ac.resume().catch(() => {}); });
+      t.blocked = false;
+      ramp(t, CFG[t.name].volume, fadeMs);
+    }
+    function stopEl(t, ms) { ramp(t, 0, ms, () => { if (!(desired && desired.name === t.name && !muted)) t.el.pause(); }); }
+
+    // name 곡을 (페이드인으로) 튼다. 다른 곡은 switchFadeMs 동안 줄어들며 멈춘다.
+    function play(name, { fadeInMs, restart = false, outMs } = {}) {
+      if (!CFG[name]) return;
+      const t = make(name);
+      desired = { name, fadeInMs: fadeInMs != null ? fadeInMs : CFG[name].fadeInMs, restart };
+      Object.values(T).forEach((o) => { if (o !== t) stopEl(o, outMs != null ? outMs : CFG.switchFadeMs); });
+      if (muted) return;
+      startEl(t, desired.fadeInMs, restart);
+    }
+    // name 곡을 페이드아웃으로 끝낸다 (다시 play 하기 전까지 조용)
+    function fadeOut(name, ms) {
+      const t = T[name]; if (!t) return;
+      if (desired && desired.name === name) desired = null;
+      stopEl(t, ms != null ? ms : CFG[name].fadeOutMs);
+    }
+    // 첫 사용자 터치: 오디오 잠금 해제 (두 곡 모두) + 보류된 곡 시작
+    function kick() {
+      const c = ensureCtx(), sus = !!(c && c.state === "suspended");
+      if (sus) c.resume().catch(() => {});
+      Object.keys(CFG).forEach((name) => {
+        if (!CFG[name] || !CFG[name].src) return;
+        const t = make(name);
+        if (t.unlocked || (desired && desired.name === name)) return;
+        const p = t.el.play();                                     // 소리 0 으로 잠깐 재생했다 멈춰서 iOS 잠금을 풀어 둔다 (실제로 재생되면 완료 처리)
+        if (p && typeof p.then === "function") p.then(() => { t.unlocked = true; if (!(desired && desired.name === name)) t.el.pause(); }).catch(() => {});
+      });
+      if (desired && !muted) {
+        const t = make(desired.name);
+        if (t.blocked || t.el.paused || sus) { setVol(t, 0); startEl(t, desired.fadeInMs, false); }   // (소리가 막혀 있던 동안 지나간 페이드를 다시 처음부터)
+      }
+    }
+    function setMuted(m) {
+      muted = !!m;
+      if (muted) Object.values(T).forEach((t) => stopEl(t, 220));
+      else if (desired) startEl(make(desired.name), 700, false);
+    }
+    // 탭이 가려지면 멈추고, 돌아오면 이어서 (모바일에서 백그라운드 재생 방지)
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) Object.values(T).forEach((t) => { t.el.pause(); });
+      else if (desired && !muted) startEl(make(desired.name), 600, false);
+    });
+    make("intro"); make("story");                                  // 미리 불러 두기
+    const debug = () => ({ desired: desired && desired.name, muted, ctx: ac && ac.state, tracks: Object.values(T).map((t) => ({ name: t.name, paused: t.el.paused, vol: +t.v.toFixed(3), g: t.gain ? +t.gain.gain.value.toFixed(3) : null, time: +t.el.currentTime.toFixed(1), broken: t.broken })) });
+    return { play, fadeOut, kick, setMuted, debug, ctx: () => ac, get muted() { return muted; } };
+  })();
+
+  // ---- 효과음: 짧은 소리를 겹쳐 재생 (WebAudio 버퍼, 파일로 직접 열었을 땐 <audio>). ♪ 음악 끄기 중에는 소리를 내지 않는다 ----
+  const Sfx = (() => {
+    const CFG = D.music.sfx || {};
+    const bufs = {}, active = new Set();
+    let loading = false;
+    function load() {                                              // WebAudio 가 있으면 미리 불러와 디코딩해 둔다 (지연 없이 재생)
+      const ac = Music.ctx();
+      if (!ac || loading) return;
+      loading = true;
+      Object.keys(CFG).forEach((name) => {
+        fetch(CFG[name].src).then((r) => r.arrayBuffer()).then((ab) => new Promise((ok, no) => ac.decodeAudioData(ab, ok, no))).then((b) => { bufs[name] = b; }).catch(() => {});
+      });
+    }
+    function play(name, delayMs) {
+      const c = CFG[name];
+      if (!c || Music.muted) return;
+      const wait = (delayMs != null ? delayMs : c.delayMs) || 0;
+      if (wait > 0) { window.setTimeout(() => play(name, -1), wait); return; }
+      const ac = Music.ctx();
+      if (ac && bufs[name]) {
+        if (ac.state === "suspended") ac.resume().catch(() => {});
+        const src = ac.createBufferSource(), g = ac.createGain();
+        src.buffer = bufs[name]; g.gain.value = c.volume != null ? c.volume : 1;
+        src.connect(g); g.connect(ac.destination);
+        const h = { stop() { try { g.gain.cancelScheduledValues(0); g.gain.setTargetAtTime(0, ac.currentTime, 0.02); src.stop(ac.currentTime + 0.1); } catch (e) {} } };
+        active.add(h); src.onended = () => active.delete(h);
+        src.start();
+      } else if (!ac) {                                            // file:// 등: <audio> 로 대신 재생
+        const a = new Audio(c.src); a.volume = c.volume != null ? c.volume : 1;
+        const h = { stop() { try { a.pause(); } catch (e) {} } };
+        active.add(h); a.addEventListener("ended", () => active.delete(h));
+        const p = a.play(); if (p && p.catch) p.catch(() => active.delete(h));
+      }
+    }
+    function stopAll() { active.forEach((h) => h.stop()); active.clear(); }
+    load();
+    return { play, stopAll };
+  })();
+  window.PartyGame.sfx = Sfx;
+
+  // ==========================================================================
+  // SCENE 1: 첫 화면 인트로 (intro.js — 봉투가 날아와 열리고 편지지가 올라옴) + 초대장 받기 버튼
+  // ==========================================================================
+  //
+  // 편지지가 멈추면 intro.js 가 '초대장 받기' 버튼을 켜 주고, 누르면 음악을 켜고 너드 지나 1 로 넘어갑니다.
+
+  const btnInvite = document.getElementById("btnInvite");
+
+  // 처음부터 다시 재생 (첫 로드, "다시하기", 처음부터 되돌리기)
+  function resetEnvelopeScene() { window.IntroScene.play(); Music.play("intro", { restart: true }); }
+  // "뒤로 가기" 로 돌아왔을 때: 다시 재생하지 않고 편지지가 나온 마지막 장면 + 버튼
+  function showIntroEnd() { window.IntroScene.showEnd(); Music.play("intro", { restart: true }); }
+
+  // 초대장 받기 → 흰색 소프트 페이드 → 너드 지나 1.  페이드가 차오르는 동안 첫 장면 이미지(+흔들림용 두 번째 장)를 미리 디코딩해서,
+  // 장면이 바뀌는 순간 그림 해석 때문에 끊기지 않게 한다.
+  let introLeaving = false;
+  btnInvite.addEventListener("click", () => {
+    if (introLeaving) return;
+    introLeaving = true;
+    startMusic();
+    Sfx.play("click");                                // 초대장 받기 버튼음
+    // 첫 곡은 페이드아웃, 두 번째 곡은 같은 순간부터 페이드인(크로스페이드) → 화면이 하얗게 넘어가는 동안 소리가 끊기지 않는다
+    Music.play("story", { restart: true, outMs: D.music.crossFadeMs });
+    btnInvite.classList.remove("pulse");
+    prewarmStoryStart();
+    const SOFT = D.softTransition;
+    transitionTo("story", () => {
+      introLeaving = false;
+      startStory({ instant: true, textDelayMs: SOFT.textDelayMs });
+    }, SOFT);
+  });
+
+  resetEnvelopeScene();
+
+  // ==========================================================================
+  // SCENE: 지나 스토리 (photo scene — nerd route → blossom route, stacked composite images)
+  // ==========================================================================
+  //
+  // Everything is driven by D.story.steps (data.js). A step is one screen:
+  //
+  //   dialogue : frames (1 image, or 2 that sway until tapped), typed text, blinking ▶, tap → next
+  //   choice   : two item cards; hovering / pressing shows the pressed look, click picks it
+  //   wrong    : sway + 빠직 marks until the player taps / presses a card
+  //   gloss    : text typed while the hair-shine travels down the hair, then auto → next
+  //   result   : (sunset route only, until its images arrive) pressed image + toast
+  //
+  // The speech-box text is NOT part of the shipped images: the images are text-free,
+  // and the text lives in assets/text/text-<id>.png with a glyph map
+  // (assets/text/dialogue-map.js) so it can be typed one letter at a time on a
+  // <canvas>. Petals / 빠직 marks / card "pressed" looks are separate sprites
+  // (assets/fx, positions in assets/fx/fx-map.js). Offline tools in /tools make them.
+  //
+  // The three top-left icons are baked into every image; invisible hotspots
+  // sit on them: 1 뒤로가기 / 2 음악 끄기·켜기 / 3 되돌리기(인트로부터 다시).
+
+  const sceneStory = document.getElementById("scene-story");
+  const storyTap = document.getElementById("storyTap");
+  const cardBtns = { L: document.getElementById("cardL"), R: document.getElementById("cardR") };
+  const typeCanvas = document.getElementById("typeCanvas");
+  const typeCtx = typeCanvas.getContext("2d");
+  const arrowMark = document.getElementById("arrowMark");
+  const mutePatch = document.getElementById("mutePatch");
+  const storyFx = document.getElementById("storyFx");
+  const glossLayer = document.getElementById("glossLayer");
+  const glossCanvas = document.getElementById("glossCanvas");
+  const glossCtx = glossCanvas.getContext("2d");
+  const glossTmp = document.createElement("canvas");
+  glossTmp.width = glossCanvas.width; glossTmp.height = glossCanvas.height;
+  const glossTmpCtx = glossTmp.getContext("2d");
+  const glossImgs = { soft: new Image(), glint: new Image() };
+  glossImgs.soft.src = (window.FX_MAP && window.FX_MAP.hairMask) || "assets/fx/hair-mask.png";
+  glossImgs.glint.src = "assets/fx/hair-glint.png";
+  // 선셋 허니 루트: 자기 머리 모양 마스크
+  const glossImgsSun = { soft: new Image(), glint: new Image() };
+  glossImgsSun.soft.src = (window.FX_MAP_SUN && window.FX_MAP_SUN.hairMask) || "assets/fx/sn-hair-mask.png";
+  glossImgsSun.glint.src = (window.FX_MAP_SUN && window.FX_MAP_SUN.hairGlint) || "assets/fx/sn-hair-glint.png";
+  const ST = D.story;
+  const TY = ST.typing;
+  const STEPS = ST.steps;
+  const MAP = window.DIALOGUE_MAP || { text: {}, arrows: {} };
+  const FX = window.FX_MAP || { petals: [], marks: {}, cards: {} };
+  const FX_SUN = window.FX_MAP_SUN || { petals: [], marks: {}, cards: {} };
+  // petals / marks / card patches / hair mask are cut from the pictures of each route
+  const SUN_ROUTES = new Set(["sunset", "sparty", "shall"]);
+  const fxFor = (route) => (SUN_ROUTES.has(route) ? FX_SUN : FX);
+
+  sceneStory.style.setProperty("--story-fade", `${ST.fadeMs}ms`);
+  sceneStory.style.setProperty("--hover-fade", `${ST.hoverFadeMs}ms`);
+
+  const story = {
+    phase: null, route: null, ready: false, locked: false, timers: [], fadeToken: 0, swayTimer: 0,
+    hover: null, textGid: null, stack: [], petals: [], marks: [], patchTimer: 0,
+  };
+
+  // ---- the stack of composite images (created here so the HTML stays small) ----
+  const imgByKey = {};
+  const imgSrc = (key) => `assets/scenes/${key}.webp`;
+  ST.images.forEach((key) => {
+    const im = document.createElement("img");
+    im.className = "scene-bg story-img";
+    im.alt = ""; im.draggable = false; im.decoding = "async";
+    im.dataset.key = key; im.dataset.naturalW = "402"; im.dataset.naturalH = "874";
+    sceneStory.insertBefore(im, glossLayer);
+    imgByKey[key] = im;
+    if (key.startsWith("nerd")) im.src = imgSrc(key);       // blossom images are fetched a bit later (warmRoute)
+  });
+  const warmed = {};
+  function warmRoute(route) {
+    if (warmed[route]) return;
+    warmed[route] = true;
+    ST.images.filter((k) => ST.routes[route].prefix && k.startsWith(ST.routes[route].prefix + "-")).forEach((k) => {
+      if (!imgByKey[k].src) imgByKey[k].src = imgSrc(k);
+    });
+  }
+  warmed.nerd = true;
+  // After the page has settled, fetch both routes' pictures in the background (instead of waiting for the choice screen),
+  // so no screen has to be downloaded while the player is tapping through.
+  function warmAllRoutes() { ["blossom", "sunset"].forEach((r, i) => window.setTimeout(() => warmRoute(r), i * 1500)); }
+  (function () {
+    const go = () => window.setTimeout(warmAllRoutes, 2500);
+    if (document.readyState === "complete") go(); else window.addEventListener("load", go, { once: true });
+  })();
+
+  // ---- preload the text / arrow / fx layers ----
+  const layerImgs = {};
+  function layerImg(path) {
+    if (!layerImgs[path]) { const im = new Image(); im.src = path; layerImgs[path] = im; }
+    return layerImgs[path];
+  }
+  Object.values(MAP.text).forEach((t) => layerImg(t.png));
+  Object.values(MAP.arrows).forEach((a) => layerImg(a.png));
+
+  // fx sprites live in one layer that exactly covers the picture, so they use % of the picture
+  function fxSprite(src, rect, cls) {
+    const el = document.createElement("img");
+    el.className = `fx-sprite ${cls}`;
+    el.src = src; el.alt = ""; el.draggable = false;
+    el.style.left = `${rect.x * 100}%`; el.style.top = `${rect.y * 100}%`;
+    el.style.width = `${rect.w * 100}%`; el.style.height = `${rect.h * 100}%`;
+    storyFx.appendChild(el);
+    return el;
+  }
+  const patchSets = { A: {}, B: {}, S: {}, S2: {} };
+  [["A", FX.cards], ["B", FX.cards2], ["S", FX_SUN.cards], ["S2", FX_SUN.cards2]].forEach(([set, cards]) => {
+    ["L", "R"].forEach((s) => { if (cards && cards[s]) patchSets[set][s] = fxSprite(cards[s].src, cards[s].rect, "card-patch"); });
+  });
+  story.cardSet = "A";
+  [FX, FX_SUN].forEach((F) => {
+    (F.petals || []).forEach((p) => layerImg(p.src));
+    Object.values(F.marks || {}).forEach((m) => layerImg(m.src));
+  });
+
+  function clearStoryTimers() {
+    story.timers.forEach((t) => window.clearTimeout(t));
+    story.timers = [];
+  }
+  function storyLater(fn, ms) { story.timers.push(window.setTimeout(fn, ms)); }
+
+  // Show image `key`. Fade = new image fades in ON TOP of the old one, so the
+  // background never dips through while both are semi-transparent.
+  // Decode the pictures that can come next while the player is reading (large pictures otherwise decode on first paint → hitch).
+  const decodedKeys = new Set();
+  function predecodeNext(cfg) {
+    window.setTimeout(() => {
+      const keys = [];
+      const addStep = (sid) => {
+        const st = sid && STEPS[sid];
+        if (st && st.frames) keys.push(st.frames[0]);
+      };
+      if (cfg.next) addStep(cfg.next);
+      if (cfg.cards) ["L", "R"].forEach((side) => {
+        const c = cfg.cards[side];
+        if (!c) return;
+        if (c.hoverImg) keys.push(c.hoverImg);
+        if (c.go) addStep(c.go.startsWith("@") ? (ST.routeStart || {})[c.go] : c.go);
+      });
+      keys.forEach((k) => {
+        const im = imgByKey[k];
+        if (!k || decodedKeys.has(k) || !im || !im.src || !im.decode) return;
+        decodedKeys.add(k);
+        im.decode().catch(() => decodedKeys.delete(k));
+      });
+    }, 500);
+  }
+
+  function storyShow(key, { fade = true, ms = ST.fadeMs } = {}) {
+    const target = imgByKey[key];
+    if (!target) return;
+    const imgs = Object.values(imgByKey);
+    const token = ++story.fadeToken;
+    imgs.forEach((i) => { if (i !== target) i.classList.remove("incoming", "fading"); });
+    const cur = imgs.find((i) => i.classList.contains("cur"));
+    if (cur === target) { target.classList.remove("incoming", "fading"); return; }
+    if (!fade || !cur) {
+      imgs.forEach((i) => i.classList.remove("cur", "incoming", "fading"));
+      target.classList.add("cur");
+      refillSides();
+      return;
+    }
+    sceneStory.style.setProperty("--story-fade", `${ms}ms`);
+    target.classList.add("incoming");
+    void target.offsetWidth;           // commit opacity:0 before animating
+    target.classList.add("fading");
+    window.setTimeout(() => {
+      if (token !== story.fadeToken) return;
+      imgs.forEach((i) => i.classList.remove("cur", "incoming", "fading"));
+      target.classList.add("cur");
+    }, ms + 30);
+  }
+
+  // The mirrored wallpaper on wide screens is taken from one fixed picture per route
+  function setRoute(route) {
+    if (story.route === route) return;
+    story.route = route;
+    setPcTheme(SUN_ROUTES.has(route));            // PC 배경: 선셋 루트는 금색 새틴
+    warmRoute(route);
+    const R = ST.routes[route];
+    sceneStory._fillImg = imgByKey[R.fill];
+    if (window.LetterScene && (route === "hall" || route === "shall")) window.LetterScene.preload(route === "shall" ? "sunset" : "blossom");   // the letter screen comes after 24
+    mutePatch.src = R.mute;
+    layoutPhotoScene(sceneStory);
+  }
+  function refillSides() { layoutPhotoScene(sceneStory); }
+
+  function setStoryActive({ tap = false, cards = null }) {
+    storyTap.classList.toggle("active", tap);
+    cardBtns.L.classList.toggle("active", !!(cards && cards.L));
+    cardBtns.R.classList.toggle("active", !!(cards && cards.R));
+    if (tap || cards) layoutPhotoScene(sceneStory);
+  }
+
+  // ==========================================================================
+  // TYPEWRITER (speech-box text, one letter at a time)
+  // ==========================================================================
+
+  const typer = { gid: null, raf: 0, events: [], total: 0, start: 0, done: true, onDone: null, hideTimer: 0 };
+
+  function buildTimeline(map) {
+    const ev = [];
+    let t = 0;
+    map.lines.forEach((line, li) => {
+      const chars = Array.from(line.text.replace(/\s/g, ""));
+      line.glyphs.forEach((g, gi) => {
+        ev.push({ t, li, gi });
+        const punct = /[.,!?~]/.test(chars[gi] || "");
+        t += TY.glyphMs * (punct ? 1.9 : 1) + (g.space ? TY.spaceMs : 0);
+      });
+      t += TY.lineGapMs;
+    });
+    return { ev, total: t };
+  }
+
+  function typerDraw(now) {
+    const map = MAP.text[typer.gid];
+    if (!map) return;
+    typeCtx.clearRect(0, 0, typeCanvas.width, typeCanvas.height);
+    const img = layerImg(map.png);
+    for (const e of typer.events) {
+      if (e.t > now) break;
+      const line = map.lines[e.li], g = line.glyphs[e.gi];
+      const a = Math.min(1, (now - e.t) / TY.fadeInMs);
+      const w = g.x1 - g.x0, h = line.y1 - line.y0;
+      typeCtx.globalAlpha = a;
+      typeCtx.drawImage(img, g.x0, line.y0, w, h, g.x0, line.y0, w, h);
+    }
+    typeCtx.globalAlpha = 1;
+  }
+
+  function typerFinish() {
+    window.cancelAnimationFrame(typer.raf);
+    typer.raf = 0;
+    typerDraw(1e9);
+    typer.done = true;
+    const cb = typer.onDone; typer.onDone = null;
+    if (cb) cb();
+  }
+
+  function typerCancel() {
+    window.cancelAnimationFrame(typer.raf);
+    typer.raf = 0;
+    window.clearTimeout(typer.hideTimer);
+    typer.onDone = null;
+  }
+
+  // Put text group `gid` on screen. instant = no typing (already read / coming back).
+  function typerShow(gid, { instant = false, onDone = null } = {}) {
+    const map = MAP.text[gid];
+    typerCancel();
+    if (!map) { typer.done = true; if (onDone) onDone(); return; }
+    // same text still on screen → keep it (no retyping)
+    if (story.textGid === gid && typer.gid === gid && typer.done) { if (onDone) onDone(); return; }
+    typer.gid = gid;
+    story.textGid = gid;
+    typeCanvas.width = map.w;
+    typeCanvas.height = map.h;
+    HOTSPOT_RECTS.typeText = map.rect;
+    typeCanvas.classList.remove("fade-out");
+    layoutPhotoScene(sceneStory);
+    const built = buildTimeline(map);
+    typer.events = built.ev;
+    typer.total = built.total;
+    typer.onDone = onDone;
+    typer.done = false;
+    if (instant) { typerFinish(); return; }
+    typeCtx.clearRect(0, 0, typeCanvas.width, typeCanvas.height);
+    typer.start = performance.now() + TY.startDelayMs;
+    const tick = () => {
+      const now = performance.now() - typer.start;
+      typerDraw(Math.max(0, now));
+      if (now >= typer.total + TY.fadeInMs) { typerFinish(); return; }
+      typer.raf = window.requestAnimationFrame(tick);
+    };
+    typer.raf = window.requestAnimationFrame(tick);
+  }
+
+  // Remove the text (fades out, then clears).
+  function typerHide({ instant = false } = {}) {
+    typerCancel();
+    typer.done = true;
+    story.textGid = null;
+    typer.gid = null;
+    if (instant) {
+      typeCanvas.classList.remove("fade-out");
+      typeCtx.clearRect(0, 0, typeCanvas.width, typeCanvas.height);
+      return;
+    }
+    typeCanvas.classList.add("fade-out");
+    typer.hideTimer = window.setTimeout(() => {
+      if (!typer.gid) typeCtx.clearRect(0, 0, typeCanvas.width, typeCanvas.height);
+    }, 260);
+  }
+
+  function showArrow(id) {
+    const a = MAP.arrows[id];
+    if (!a) return;
+    if (!arrowMark.src.endsWith(a.png)) arrowMark.src = a.png;
+    HOTSPOT_RECTS.typeArrow = a.rect;
+    layoutPhotoScene(sceneStory);
+    arrowMark.classList.add("show");
+  }
+  function hideArrow() { arrowMark.classList.remove("show"); }
+
+  // ==========================================================================
+  // SWAY (two poses alternate until the player taps)
+  // ==========================================================================
+
+  function stopSway() {
+    window.clearInterval(story.swayTimer);
+    story.swayTimer = 0;
+  }
+  function startSway(frames) {
+    stopSway();
+    let i = 0;
+    story.swayTimer = window.setInterval(() => {
+      i = (i + 1) % frames.length;
+      storyShow(frames[i], { ms: ST.sway.fadeMs });
+    }, ST.sway.holdMs);
+  }
+
+  // ==========================================================================
+  // FX: petals around Jina (blossom 1), 빠직 marks (wrong answer), pressed-card patches, hair gloss
+  // ==========================================================================
+
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  // petals / roses: drift a little (each its own way), then vanish — after ~1.5–2.3 s
+  function clearPetals(soft) {
+    // soft: leaving early → the petals just finish their flight 4x faster (they fade at the end)
+    story.petals.forEach((a) => { try { if (soft && a.playState === "running") a.playbackRate = 4; else a.cancel(); } catch (e) {} });
+    story.petals = [];
+    if (!soft) storyFx.querySelectorAll(".petal").forEach((el) => el.remove());
+  }
+  function spawnPetals() {
+    clearPetals();
+    const L = layoutPhotoScene(sceneStory);
+    if (!L) return;
+    const P = ST.petals, W = L.renderW, H = L.renderH;
+    fxFor(story.route).petals.forEach((p) => {
+      const rose = p.kind === "rose";
+      const el = fxSprite(p.src, p.rect, rose ? "petal rose" : "petal");
+      const side = p.cx < 0.5 ? -1 : 1;
+      let dur = rnd(P.driftMinMs, P.driftMaxMs);
+      const delay = 0;                                  // no standing still: every petal is moving from the first frame
+      let dx = rose ? side * rnd(0.004, 0.012) * W : (side * rnd(0.008, 0.04) + rnd(-0.015, 0.015)) * W;
+      let dy = rose ? rnd(0.004, 0.014) * H : rnd(0.02, 0.055) * H;
+      let rot = rose ? rnd(-8, 8) : rnd(-38, 38);
+      let sw = rnd(-0.012, 0.012) * W;
+      let s1 = rose ? 1.04 : 1, s2 = rose ? 1.07 : 0.98, s3 = rose ? 1.02 : 0.94;
+      const M = p.motion;
+      if (M) { dur = M.dur; dx = M.dx * W; dy = M.dy * H; rot = M.rot; sw = M.sw * W; [s1, s2, s3] = M.s; }   // precomputed collision-free path (sunset): pieces never cross each other
+      const kf = [
+        { transform: "translate(0px,0px) rotate(0deg) scale(1)", opacity: 1, offset: 0 },
+        { transform: `translate(${dx * 0.35 + sw}px,${dy * 0.3}px) rotate(${rot * 0.4}deg) scale(${s1})`, opacity: 1, offset: 0.3 },
+        { transform: `translate(${dx * 0.7 - sw * 0.7}px,${dy * 0.68}px) rotate(${rot * 0.8}deg) scale(${s2})`, opacity: 1, offset: 0.66 },
+        { transform: `translate(${dx}px,${dy}px) rotate(${rot}deg) scale(${s3})`, opacity: 0, offset: 1 },
+      ];
+      const anim = el.animate(kf, { duration: dur, delay, easing: "cubic-bezier(0.22, 0.45, 0.5, 1)", fill: "both" });
+      anim.onfinish = () => el.remove();
+      story.petals.push(anim);
+    });
+  }
+
+  // 빠직 marks: pop in with a bounce, then keep throbbing (and wobbling between the two
+  // positions of the original two frames) until the player moves on
+  function stopMarks(soft) {
+    const els = Array.from(storyFx.querySelectorAll(".mark"));
+    if (soft && els.length) {
+      const olds = story.marks;                       // keep throbbing while fading out
+      els.forEach((el) => el.classList.add("leaving"));
+      window.setTimeout(() => { olds.forEach((a) => { try { a.cancel(); } catch (e) {} }); els.forEach((el) => el.remove()); }, 260);
+    } else {
+      story.marks.forEach((a) => { try { a.cancel(); } catch (e) {} });
+      els.forEach((el) => el.remove());
+    }
+    story.marks = [];
+  }
+  function startMarks({ pop = true } = {}) {
+    stopMarks();
+    const L = layoutPhotoScene(sceneStory);
+    if (!L) return;
+    const M = ST.marks;
+    ["big", "small"].forEach((name, i) => {
+      const m = fxFor(story.route).marks[name];
+      if (!m) return;
+      const el = fxSprite(m.src, m.rect, `mark mark-${name}`);
+      const dx = m.to5.dx * L.renderW, dy = m.to5.dy * L.renderH;
+      const loop = () => {
+        const a = el.animate([
+          { transform: "translate(0px,0px) scale(1) rotate(0deg)", offset: 0 },
+          { transform: `translate(${dx * 0.5}px,${dy * 0.5}px) scale(1.13) rotate(4deg)`, offset: 0.25 },
+          { transform: `translate(${dx}px,${dy}px) scale(1) rotate(-1deg)`, offset: 0.5 },
+          { transform: `translate(${dx * 0.5}px,${dy * 0.5}px) scale(1.13) rotate(-4deg)`, offset: 0.75 },
+          { transform: "translate(0px,0px) scale(1) rotate(0deg)", offset: 1 },
+        ], { duration: M.loopMs, iterations: Infinity, easing: "ease-in-out" });
+        story.marks.push(a);
+      };
+      if (!pop) { loop(); return; }
+      const popAnim = el.animate([
+        { transform: "scale(0.1) rotate(-30deg)", opacity: 0, offset: 0 },
+        { transform: "scale(1.4) rotate(8deg)", opacity: 1, offset: 0.55 },
+        { transform: "scale(0.9) rotate(-3deg)", opacity: 1, offset: 0.8 },
+        { transform: "scale(1) rotate(0deg)", opacity: 1, offset: 1 },
+      ], { duration: M.popMs, delay: i * M.staggerMs, easing: "cubic-bezier(.2,.8,.3,1)", fill: "both" });
+      popAnim.onfinish = () => { popAnim.cancel(); loop(); };
+      story.marks.push(popAnim);
+    });
+  }
+
+  // "pressed" look of a card as a patch over the picture (hover / press / locked-in)
+  function showPatch(side) { const el = patchSets[story.cardSet][side]; if (el) el.classList.add("on"); }
+  function hidePatch(side) { Object.values(patchSets).forEach((set) => { if (set[side]) set[side].classList.remove("on"); }); }
+  function hidePatches() { ["L", "R"].forEach(hidePatch); }
+
+  // hair gloss: a soft bright band travels top → bottom along the hair (drawn only through the
+  // hair-shaped mask, stronger on the light strands), `passes` times
+  const gloss = { raf: 0, token: 0 };
+  const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+  // one band (skewed a little), clipped to the hair shape of `img`, drawn into the main canvas
+  function glossBand(img, f, hFrac, stops, alpha) {
+    if (!img.complete || !img.naturalWidth || alpha <= 0.002) return;
+    const W = glossCanvas.width, H = glossCanvas.height, bh = hFrac * H;
+    const t = glossTmpCtx;
+    t.globalCompositeOperation = "source-over";
+    t.clearRect(0, 0, W, H);
+    t.save();
+    t.translate(W / 2, (f / 100) * H);
+    t.transform(1, Math.tan((-5 * Math.PI) / 180), 0, 1, 0, 0);
+    const g = t.createLinearGradient(0, -bh / 2, 0, bh / 2);
+    stops.forEach(([p, c]) => g.addColorStop(p, c));
+    t.fillStyle = g;
+    t.fillRect(-W * 0.6, -bh / 2, W * 1.2, bh);
+    t.restore();
+    t.globalCompositeOperation = "destination-in";
+    t.drawImage(img, 0, 0, W, H);
+    glossCtx.globalAlpha = alpha;
+    glossCtx.drawImage(glossTmp, 0, 0);
+    glossCtx.globalAlpha = 1;
+  }
+  const SOFT_STOPS = [[0, "rgba(255,238,208,0)"], [0.2, "rgba(255,240,212,.22)"], [0.4, "rgba(255,246,228,.62)"], [0.5, "rgba(255,252,240,.95)"], [0.6, "rgba(255,246,228,.62)"], [0.8, "rgba(255,240,212,.22)"], [1, "rgba(255,238,208,0)"]];
+  const GLINT_STOPS = [[0, "rgba(255,255,255,0)"], [0.38, "rgba(255,255,255,.55)"], [0.5, "#fff"], [0.62, "rgba(255,255,255,.55)"], [1, "rgba(255,255,255,0)"]];
+  function glossFront(f, op) {
+    glossCtx.clearRect(0, 0, glossCanvas.width, glossCanvas.height);
+    const gi = story.route === "sunset" ? glossImgsSun : glossImgs;
+    glossBand(gi.soft, f, 0.30, SOFT_STOPS, op);
+    glossBand(gi.glint, f, 0.22, GLINT_STOPS, op);
+  }
+  function glossStop() {
+    gloss.token++;
+    window.cancelAnimationFrame(gloss.raf);
+    glossLayer.classList.remove("on");
+  }
+  function glossRun(onEnd) {
+    glossStop();
+    const G = ST.gloss, my = gloss.token;
+    glossLayer.classList.add("on");
+    layoutPhotoScene(sceneStory);
+    glossFront(G.from, 0);
+    Sfx.play("glow");                                        // 머리 반짝임이 흐르기 시작할 때
+    const t0 = performance.now() + G.startDelayMs;
+    const cycle = G.sweepMs + G.gapMs;
+    const total = G.passes * cycle - G.gapMs;
+    const tick = (now) => {
+      if (my !== gloss.token) return;
+      const el = now - t0;
+      if (el < 0) { gloss.raf = window.requestAnimationFrame(tick); return; }
+      if (el >= total) {
+        glossLayer.classList.remove("on");
+        glossFront(G.from, 0);
+        if (onEnd) onEnd();
+        return;
+      }
+      const inPass = el % cycle;
+      if (inPass > G.sweepMs) { glossFront(G.to, 0); }
+      else {
+        const t = inPass / G.sweepMs;
+        const f = G.from + (G.to - G.from) * easeInOut(t);
+        const o = Math.min(1, t / 0.14, (1 - t) / 0.2) * G.strength;
+        glossFront(f, Math.max(0, o));
+      }
+      gloss.raf = window.requestAnimationFrame(tick);
+    };
+    gloss.raf = window.requestAnimationFrame(tick);
+  }
+
+  // ==========================================================================
+  // 블썸 11: 변신 반짝임 ("지나 뒤 변신 효과" behind-transform test v7)
+  //   a spiral of light blooms behind Jina, ONE bright stream runs up and swings to the front, then it melts away;
+  //   the picture ends exactly as the clean screen. Everything is drawn on a canvas that covers the picture.
+  // ==========================================================================
+  const xfLayer = document.getElementById("xfLayer");
+  const xfCanvas = document.getElementById("xfCanvas");
+  const xfCtx = xfCanvas.getContext("2d");
+  const XF = { raf: 0, token: 0, built: null, light: new Image(), charImg: new Image(), chars: {} };
+  XF.light.src = ST.transform.light;
+  XF.charImg.src = ST.transform.char;
+  XF.chars[ST.transform.char] = XF.charImg;
+  // other silhouette masks (e.g. the pouch pose of 블썸 18) are loaded on demand
+  function xfCharFor(src) {
+    src = src || ST.transform.char;
+    if (!XF.chars[src]) { const im = new Image(); im.src = src; XF.chars[src] = im; }
+    return XF.chars[src];
+  }
+  const XF_TINTS = { rose: "rgba(255,214,236,0.28)", gold: "rgba(255,226,150,0.30)" };   // faint tint so the white light blends with the room
+  const XW = 804, XH = 1748, XS = 2;
+  const XC = {
+    scaleX: 0.56, scaleY: 0.69, mapY0: -25, assetY0: 100,
+    anchor: { ax: 531, ay: 860, sx: 201, sy: 335 }, spiralY0: 60, spiralY1: 1030,
+    startDelay: 200, bloomMs: 500, stream: [200, 1400], fade: [1350, 2150],
+  };
+  const xfClamp = (x) => Math.max(0, Math.min(1, x));
+  const xfSmooth = (x) => { x = xfClamp(x); return x * x * (3 - 2 * x); };
+  const xfCanvasOf = () => { const c = document.createElement("canvas"); c.width = XW; c.height = XH; return c; };
+
+  function xfBuild(base, charImg, tint) {
+    const light = XF.light;
+    const L = {};
+    L.base = base;
+    L.tinted = document.createElement("canvas"); L.tinted.width = light.naturalWidth; L.tinted.height = light.naturalHeight;
+    let g = L.tinted.getContext("2d");
+    g.drawImage(light, 0, 0);
+    g.globalCompositeOperation = "source-atop";             // faint rose tint so the white light blends with the pink room
+    g.fillStyle = XF_TINTS[tint] || XF_TINTS.rose; g.fillRect(0, 0, L.tinted.width, L.tinted.height);
+
+    L.charLayer = xfCanvasOf();
+    let c = L.charLayer.getContext("2d");
+    c.imageSmoothingQuality = "high";
+    c.drawImage(base, 0, 0, XW, XH);
+    c.globalCompositeOperation = "destination-in";
+    c.drawImage(charImg, 0, 0, XW, XH);
+
+    // the three top-left buttons stay crisp above the light
+    const BTNS = [[59, 63], [126, 63], [184, 63]];
+    L.btnLayer = xfCanvasOf();
+    const bl = L.btnLayer.getContext("2d");
+    bl.drawImage(base, 0, 0, XW, XH);
+    const m2 = xfCanvasOf(), mc = m2.getContext("2d");
+    BTNS.forEach(([x, y]) => {
+      const gr = mc.createRadialGradient(x * XS, y * XS, 22 * XS, x * XS, y * XS, 27 * XS);
+      gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+      mc.fillStyle = gr; mc.fillRect(0, 0, XW, XH);
+    });
+    bl.globalCompositeOperation = "destination-in"; bl.drawImage(m2, 0, 0);
+
+    L.glowLayer = xfCanvasOf();
+    const gl = L.glowLayer.getContext("2d");
+    gl.drawImage(L.charLayer, 0, 0);
+    const hg = gl.createLinearGradient(0, 0, 0, XH);        // keep head / face out of the glow
+    hg.addColorStop(0, "rgba(0,0,0,1)"); hg.addColorStop(60 / 874, "rgba(0,0,0,1)");
+    hg.addColorStop(190 / 874, "rgba(0,0,0,0)"); hg.addColorStop(1, "rgba(0,0,0,0)");
+    gl.globalCompositeOperation = "destination-out"; gl.fillStyle = hg; gl.fillRect(0, 0, XW, XH);
+
+    L.headLayer = xfCanvasOf();
+    const hl = L.headLayer.getContext("2d");
+    hl.drawImage(L.charLayer, 0, 0);
+    const hg2 = hl.createLinearGradient(0, 0, 0, XH);       // head / face area goes back over the front light
+    hg2.addColorStop(0, "rgba(0,0,0,1)"); hg2.addColorStop(105 / 874, "rgba(0,0,0,1)");
+    hg2.addColorStop(185 / 874, "rgba(0,0,0,0)"); hg2.addColorStop(1, "rgba(0,0,0,0)");
+    hl.globalCompositeOperation = "destination-in"; hl.fillStyle = hg2; hl.fillRect(0, 0, XW, XH);
+
+    // the light only exists from Jina's feet up to the top of the screen
+    L.lightMask = xfCanvasOf();
+    const lm = L.lightMask.getContext("2d");
+    const lg = lm.createLinearGradient(0, 0, 0, XH);
+    lg.addColorStop(0, "rgba(0,0,0,1)"); lg.addColorStop(500 / 874, "rgba(0,0,0,1)");
+    lg.addColorStop(560 / 874, "rgba(0,0,0,0.78)"); lg.addColorStop(620 / 874, "rgba(0,0,0,0.42)");
+    lg.addColorStop(670 / 874, "rgba(0,0,0,0.12)"); lg.addColorStop(710 / 874, "rgba(0,0,0,0)"); lg.addColorStop(1, "rgba(0,0,0,0)");
+    lm.fillStyle = lg; lm.fillRect(0, 0, XW, XH);
+    L.lightBuf = xfCanvasOf();
+    L.streamBuf = xfCanvasOf();
+    return L;
+  }
+
+  function xfPlaceLight(target, img) {
+    const kx = XC.scaleX * XS, ky = XC.scaleY * XS;
+    const cx = XC.anchor.sx * XS;
+    const y0 = (XC.mapY0 - XC.assetY0 * XC.scaleY) * XS;
+    target.drawImage(img, cx - XC.anchor.ax * kx, y0, XF.light.naturalWidth * kx, XF.light.naturalHeight * ky);
+  }
+
+  function xfDraw(L, t) {
+    const ctx = xfCtx, STR = ST.transform.strength;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.drawImage(L.base, 0, 0, XW, XH);
+    const m = t - XC.startDelay;
+    if (m <= 0 || m >= XC.fade[1]) return;                  // clean picture before / after
+
+    const bloom = xfSmooth(m / XC.bloomMs);
+    const fade = 1 - xfSmooth((m - XC.fade[0]) / (XC.fade[1] - XC.fade[0]));
+    const g = bloom * fade * STR;
+
+    // 1) the spiral of light, behind the girl
+    ctx.globalAlpha = g;
+    const lb = L.lightBuf.getContext("2d");
+    lb.globalCompositeOperation = "source-over"; lb.clearRect(0, 0, XW, XH);
+    xfPlaceLight(lb, L.tinted);
+    lb.globalCompositeOperation = "destination-in"; lb.drawImage(L.lightMask, 0, 0);
+    ctx.drawImage(L.lightBuf, 0, 0);
+
+    // the one bright stream: runs bottom -> top once, swinging from behind her to in front of her
+    const q = xfClamp((m - XC.stream[0]) / (XC.stream[1] - XC.stream[0]));
+    const streamOn = q > 0 && q < 1;
+    let front = 0, bump = 0;
+    if (streamOn) {
+      const sctx = L.streamBuf.getContext("2d");
+      const yAsset = XC.spiralY1 + (XC.spiralY0 - XC.spiralY1) * xfSmooth(q);
+      const yc = (XC.mapY0 + (yAsset - XC.assetY0) * XC.scaleY) * XS;
+      sctx.globalCompositeOperation = "source-over";
+      sctx.clearRect(0, 0, XW, XH);
+      xfPlaceLight(sctx, XF.light);
+      const half = 160 * XS;
+      const grad = sctx.createLinearGradient(0, yc - half, 0, yc + half);
+      grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(0.5, "rgba(0,0,0,1)"); grad.addColorStop(1, "rgba(0,0,0,0)");
+      sctx.globalCompositeOperation = "destination-in";
+      sctx.fillStyle = grad; sctx.fillRect(0, 0, XW, XH);
+      sctx.drawImage(L.lightMask, 0, 0);
+      front = xfSmooth((q - 0.25) / 0.4);                   // 0 = behind her ... 1 = in front of her
+      bump = Math.sin(Math.PI * q);
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = fade * bloom * 0.6 * bump * (1 - front);
+      ctx.drawImage(L.streamBuf, 0, 0);                     // behind part of the stream
+    }
+
+    // 2) the girl on top
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.drawImage(L.charLayer, 0, 0);
+
+    // 3) the stream swings round to the FRONT and sweeps over her; face stays calm, body glows only faintly
+    if (streamOn) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = fade * bloom * 0.6 * bump * front;
+      ctx.drawImage(L.streamBuf, 0, 0);
+      ctx.globalAlpha = fade * 0.07 * bump;
+      ctx.drawImage(L.glowLayer, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 0.8 * front * bump;
+      ctx.drawImage(L.headLayer, 0, 0);
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.drawImage(L.btnLayer, 0, 0);                        // buttons sit above the light
+  }
+
+  function xfStop() {
+    XF.token++;
+    window.cancelAnimationFrame(XF.raf);
+    xfLayer.classList.remove("on");
+  }
+  function xfRun(onEnd, baseKey, charSrc, tint) {
+    xfStop();
+    const my = XF.token;
+    const baseImg = imgByKey[baseKey || "bl-12"];
+    const charImg = xfCharFor(charSrc);
+    const t0 = performance.now();
+    const waitReady = () => {
+      if (my !== XF.token) return;
+      const ok = baseImg.complete && baseImg.naturalWidth && XF.light.complete && XF.light.naturalWidth && charImg.complete && charImg.naturalWidth;
+      if (!ok) {
+        if (performance.now() - t0 > 3000) { if (onEnd) onEnd(); return; }       // assets missing: just move on
+        XF.raf = window.requestAnimationFrame(waitReady);
+        return;
+      }
+      if (!XF.built || XF.built.base !== baseImg || XF.built.charImg !== charImg || XF.built.tint !== tint) { XF.built = xfBuild(baseImg, charImg, tint); XF.built.charImg = charImg; XF.built.tint = tint; }
+      const L = XF.built;
+      xfLayer.classList.add("on");
+      layoutPhotoScene(sceneStory);
+      const TOTAL = ST.transform.totalMs;
+      const tStart = performance.now();
+      Sfx.play("magic", ST.transform.sfxDelayMs);            // 반짝임이 실제로 차오르는 시점(약 0.8초에 가장 밝음)에 소리의 하이라이트를 맞춤
+      const tick = (now) => {
+        if (my !== XF.token) return;
+        const t = now - tStart;
+        xfDraw(L, Math.min(t, TOTAL));
+        if (t < TOTAL) { XF.raf = window.requestAnimationFrame(tick); return; }
+        xfLayer.classList.remove("on");
+        if (onEnd) onEnd();
+      };
+      XF.raf = window.requestAnimationFrame(tick);
+    };
+    waitReady();
+  }
+
+  // ==========================================================================
+  // 블썸 21 → 22: the curtain closes over the picture, then its two halves gather to the sides
+  // ==========================================================================
+  const curtainLayer = document.getElementById("curtainLayer");
+  const curtainHalves = [document.getElementById("curtainL"), document.getElementById("curtainR")];
+  const curtain = { token: 0, anims: [], timers: [] };
+  function curtainClear() {
+    curtain.timers.forEach((t) => window.clearTimeout(t)); curtain.timers = [];
+    curtain.anims.forEach((a) => { try { a.cancel(); } catch (e) {} }); curtain.anims = [];
+  }
+  function curtainStop() {
+    curtain.token++;
+    curtainClear();
+    curtainLayer.classList.remove("show", "on", "instant");
+  }
+  function curtainOpenTo(id) {
+    const C = ST.curtain;
+    curtainStop();
+    const my = curtain.token;
+    const later = (fn, ms) => curtain.timers.push(window.setTimeout(() => { if (my === curtain.token) fn(); }, ms));
+    story.locked = true;
+    hideArrow();
+    stopSway();
+    // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
+    Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
+    const curSrc = `assets/scenes/${SUN_ROUTES.has(STEPS[id].route) ? "sn" : "bl"}-21.webp`;      // the closed curtain of the route
+    curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
+    layoutPhotoScene(sceneStory);
+    curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
+    curtainLayer.classList.add("on");
+    void curtainLayer.offsetWidth;
+    curtainLayer.classList.add("show");                      // 1) closed curtain fades in over the current picture
+    later(() => {
+      story.stack.push(story.phase);                         // 2) under the curtain: swap to the party hall (no text yet)
+      const textAt = C.holdMs + Math.round(C.openMs * C.textAtOpenFrac);
+      enterStep(id, { instant: true, textDelayMs: textAt });
+      story.locked = true;
+    }, C.fadeInMs + 30);
+    later(() => {                                            // 3) after a short pause the two halves gather to the sides
+      const left = [{ transform: "translateX(0) scaleX(1)", filter: "brightness(1)" }, { transform: "translateX(-20%) scaleX(.30)", filter: "brightness(.86)" }];
+      const right = [{ transform: "translateX(0) scaleX(1)", filter: "brightness(1)" }, { transform: "translateX(20%) scaleX(.30)", filter: "brightness(.86)" }];
+      const opt = { duration: C.openMs, easing: C.ease, fill: "both" };
+      curtain.anims = [curtainHalves[0].animate(left, opt), curtainHalves[1].animate(right, opt)];
+    }, C.fadeInMs + 30 + C.holdMs);
+    later(() => {                                            // 4) done: take the curtain away
+      curtainLayer.classList.add("instant");
+      curtainLayer.classList.remove("show", "on");
+      curtainClear();
+      story.locked = false;
+      window.setTimeout(() => curtainLayer.classList.remove("instant"), 30);
+    }, C.fadeInMs + 30 + C.holdMs + C.openMs + 40);
+  }
+
+  // ==========================================================================
+  // STEPS
+  // ==========================================================================
+
+  function stopFxAll(soft) {
+    clearPetals(soft);
+    stopMarks(soft);
+    glossStop();
+    xfStop();
+  }
+
+  function enterStep(id, { settled = false, instant = false, textDelayMs = null, fxDelayMs = null, fadeMs = null } = {}) {
+    const cfg = STEPS[id];
+    if (!cfg) return;
+    clearStoryTimers();
+    stopSway();
+    stopFxAll(!instant);
+    window.clearTimeout(story.patchTimer);
+    story.phase = id;
+    story.ready = false;
+    story.locked = false;
+    story.hover = null;
+    hideArrow();
+    setRoute(cfg.route);
+    if (cfg.route === "nerd" && id === "choice") { warmRoute("blossom"); warmRoute("sunset"); }
+
+    const isTap = cfg.kind !== "result";           // tap on the picture: skip typing (and go on when it is a dialogue)
+    setStoryActive({ tap: isTap, cards: cfg.cards || null });
+    if (cfg.kind !== "choice" && cfg.kind !== "wrong") state.route = null;
+
+    // cards that stay "pressed" in the new picture: drop the patch once the picture has faded in
+    const keepPatch = Object.values(patchSets).some((set) => Object.values(set).some((el) => el.classList.contains("on")));
+    story.cardSet = cfg.cardSet || "A";
+    if (keepPatch) story.patchTimer = window.setTimeout(hidePatches, instant ? 0 : ST.fadeMs + 60);
+
+    const frames = cfg.frames;
+    // reveal: the picture first shows frames[0] (e.g. with sparkles), then slowly melts into reveal.to
+    const RV = cfg.reveal || null;
+    storyShow(RV && settled ? RV.to : frames[0], { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
+    let revealTextDelay = null;
+    if (RV && !settled) {
+      const base = instant ? 0 : ST.fadeMs;
+      storyLater(() => storyShow(RV.to, { ms: RV.ms }), base + RV.holdMs);
+      revealTextDelay = base + RV.holdMs + Math.round(RV.ms * 0.55);
+    }
+
+    if (story.textGid && story.textGid !== cfg.text) typerHide({ instant });
+    predecodeNext(cfg);
+
+    // gloss steps: the hair shine starts together with the first letters; the step moves on
+    // once BOTH the text and the shine are finished
+    const live = (cfg.kind === "gloss" || cfg.kind === "transform") && !settled;
+    let textDone = false, glossDone = !live;
+    const tryFinish = () => {
+      if (!textDone || !glossDone) return;
+      story.ready = true;
+      if (cfg.arrow) showArrow(cfg.arrow);                       // ▶ after the text (and the shine) are done
+      else if (live) storyLater(() => advance(cfg), cfg.kind === "transform" ? 0 : ST.gloss.holdAfterMs);   // no ▶ → move on by itself
+    };
+    const done = () => {
+      textDone = true;
+      tryFinish();
+    };
+    if (live && cfg.kind === "gloss") {
+      storyLater(() => glossRun(() => { glossDone = true; tryFinish(); }), instant ? 0 : TY.afterFadeMs);
+    }
+    if (live && cfg.kind === "transform") {
+      storyLater(() => xfRun(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.char, cfg.tint), fxDelayMs != null ? fxDelayMs : 0);
+    }
+    if (cfg.text) {
+      if (settled) typerShow(cfg.text, { instant: true, onDone: done });
+      else {
+        const td = textDelayMs != null ? textDelayMs : revealTextDelay != null ? revealTextDelay : instant ? 0 : TY.afterFadeMs;
+        storyLater(() => typerShow(cfg.text, { onDone: done }), td);
+      }
+    } else {
+      done();
+    }
+
+    if (cfg.sway && frames.length > 1) startSway(frames);
+    if (cfg.fx === "petals" && !settled) storyLater(spawnPetals, fxDelayMs != null ? fxDelayMs : instant ? 120 : 200);
+    if (cfg.fx === "marks") storyLater(() => startMarks({ pop: !settled }), settled ? 0 : ST.marks.startDelayMs);
+    if (cfg.kind === "result") storyLater(() => showToast(ST.endToast, 2600, "top"), 1100);
+  }
+
+  // forward: remember where we came from (for the back button)
+  function goto(id, opts) {
+    if (story.phase) story.stack.push(story.phase);
+    enterStep(id, opts);
+  }
+
+  // next screen: normally a cross-fade; some screens come in through the soft white veil (veil) or a curtain (curtain)
+  function gotoNext(id, afterFx) {
+    const to = STEPS[id];
+    if (to && to.veil) {
+      const SOFT = to.veil === "fast" ? D.softTransitionFast : D.softTransition;   // "fast": the white clears sooner
+      story.locked = true;
+      transitionTo("story", () => {
+        story.stack.push(story.phase);
+        enterStep(id, { instant: true, fxDelayMs: SOFT.fxDelayMs != null ? SOFT.fxDelayMs : ST.transform.delayMs });
+      }, SOFT);
+    } else if (to && to.curtain) {
+      curtainOpenTo(id);
+    } else if (afterFx && ST.afterFx) {
+      goto(id, { fadeMs: ST.afterFx.fadeMs, textDelayMs: ST.afterFx.textDelayMs });   // right after a sparkle: the caption comes up quickly
+    } else {
+      goto(id);
+    }
+  }
+
+  // 블썸 24 ▶ : soft white fade → letter screen (envelope flies in, letter rises, 선물받기 / 다시하기)
+  function enterLetter() {
+    story.locked = true; story.ready = false; hideArrow(); stopSway();
+    const SOFT = D.softTransition;
+    transitionTo("letter", () => {
+      Music.fadeOut("story");                                // 마지막 화면(선물받기/다시하기): 음악 페이드아웃
+      resetStoryText();                                    // (story.phase stays on 24 so ← can come back to it)
+      Sfx.play("wind");                                      // 초대장이 날아오는 속도에 맞춘 바람 소리
+      window.LetterScene.play(250, SUN_ROUTES.has(STEPS[story.phase].route) ? "sunset" : "blossom");   // gold for 선셋, pink for 블라썸
+    }, SOFT);
+  }
+  function letterBack() {
+    Sfx.play("click");
+    transitionTo("story", () => {
+      Music.play("story", { fadeInMs: 1500 });               // 24 로 돌아오면 음악도 다시 페이드인
+      window.LetterScene.stop();
+      story.locked = false;
+      enterStep(story.phase, { settled: true, instant: true });          // back to 24 of the same route
+    });
+  }
+
+  function advance(cfg) {
+    if (cfg.toLetter) { enterLetter(); return; }
+    if (cfg.next) { story.ready = false; stopSway(); hideArrow(); gotoNext(cfg.next, cfg.kind === "transform"); return; }
+    // last screen delivered so far
+    showToast(ST.endToast, 2600, "top");
+    story.ready = true;
+  }
+
+  // tap = skip the typing first; tap again (once ready / ▶ visible) = next screen
+  storyTap.addEventListener("click", (ev) => {
+    const cfg = STEPS[story.phase];
+    if (!cfg || story.locked) return;
+    if (cfg.kind === "result") return;
+    if (!typer.done) { typerFinish(); return; }
+    if (cfg.kind === "choice" && cfg.tapGo && story.ready) {                    // ▶ visible: tap on the picture = the one possible answer
+      const r = storyTap.getBoundingClientRect();
+      if ((ev.clientY - r.top) / r.height < 0.76) pickCard(cfg.tapGo, true);          // (not on the card tray: a tap on the wrong card stays a no-op)
+      return;
+    }
+    if (cfg.kind === "choice" || cfg.kind === "wrong" || !story.ready) return;
+    advance(cfg);                                           // (자막 탭에는 효과음 없음 — 버튼에만)
+  });
+
+  // ---- cards: hover / press shows the pressed look, only a real click moves on ----
+  function hoverCard(side) {
+    const cfg = STEPS[story.phase];
+    if (!cfg || !cfg.cards || !cfg.cards[side] || story.locked || story.hover === side) return;
+    story.hover = side;
+    const c = cfg.cards[side];
+    if (c.hoverImg) storyShow(c.hoverImg, { ms: ST.hoverFadeMs });
+    else showPatch(side);
+  }
+  function unhoverCard(side) {
+    const cfg = STEPS[story.phase];
+    if (!cfg || !cfg.cards || !cfg.cards[side] || story.locked || story.hover !== side) return;
+    story.hover = null;
+    const c = cfg.cards[side];
+    if (c.hoverImg) storyShow(cfg.frames[0], { ms: ST.hoverFadeMs });
+    else hidePatch(side);
+  }
+  function pickCard(side, quiet) {
+    const cfg = STEPS[story.phase];
+    if (!cfg || !cfg.cards || !cfg.cards[side] || story.locked) return;
+    const c = cfg.cards[side];
+    story.locked = true;
+    if (!quiet) Sfx.play("click");                          // 버튼음 (카드 버튼을 직접 눌렀을 때만)
+    if (c.sfx) Sfx.play(c.sfx);                             // 꼬리빗(오답) 선택음
+    stopSway();
+    hideArrow();
+    if (c.hoverImg) storyShow(c.hoverImg, { ms: ST.hoverFadeMs }); else showPatch(side);
+    if (c.again) { story.locked = false; startMarks({ pop: true }); return; }   // wrong answer picked again
+    storyLater(() => {
+      state.route = c.route || state.route;
+      if (c.go && c.go.charAt(0) === "@") {                 // start of a route (블라썸 / 선셋 허니): same soft white fade, same petals
+        const SOFT = D.softTransition, first = ST.routeStart[c.go];
+        Sfx.play("magic");                                  // 너드 지나 → 블라썸 1 / 선셋 1
+        transitionTo("story", () => {
+          story.stack.push(story.phase);
+          enterStep(first, { instant: true, textDelayMs: SOFT.textDelayMs, fxDelayMs: SOFT.petalDelayMs });
+        }, SOFT);
+      } else if (c.go) {
+        gotoNext(c.go);
+      }
+    }, ST.pressHoldMs);
+  }
+  function wireCard(side) {
+    const btn = cardBtns[side];
+    btn.addEventListener("pointerenter", (e) => { if (e.pointerType !== "touch") hoverCard(side); });
+    btn.addEventListener("pointerdown", () => hoverCard(side));
+    btn.addEventListener("pointerleave", (e) => { if (e.pointerType !== "touch") unhoverCard(side); });
+    btn.addEventListener("pointercancel", () => unhoverCard(side));
+    btn.addEventListener("click", () => pickCard(side));
+  }
+  wireCard("L");
+  wireCard("R");
+
+  // Leaving the story scene: forget the typed text so it types again next time.
+  function resetStoryText() {
+    clearStoryTimers();
+    stopSway();
+    stopFxAll();
+    curtainStop();
+    hideArrow();
+    hidePatches();
+    typerHide({ instant: true });
+  }
+
+  function startStory(opts) {
+    story.stack = [];
+    story.phase = null;
+    enterStep("invite", opts);
+  }
+
+  // 큰 이미지(1206x2622)는 처음 화면에 그려질 때 디코딩하느라 한 번 끊길 수 있어서, 첫 장면에 쓰이는 이미지들을 미리 디코딩해 둔다.
+  // (인트로가 재생되는 동안 한 번, 초대장 받기를 누를 때 한 번 더)
+  let prewarmP = null;
+  function prewarmStoryStart() {
+    const dec = (im) => (im && im.decode ? im.decode().catch(() => {}) : Promise.resolve());
+    const keys = [];
+    ["invite", "help"].forEach((id) => (STEPS[id].frames || []).forEach((k) => keys.push(k)));
+    const list = keys.map((k) => dec(imgByKey[k]));
+    list.push(dec(sceneStory._fillImg || imgByKey[ST.routes.nerd.fill]));
+    ["invite"].forEach((id) => { const c = STEPS[id]; if (c.text && MAP.text[c.text]) list.push(dec(layerImg(MAP.text[c.text].png))); if (c.arrow && MAP.arrows[c.arrow]) list.push(dec(layerImg(MAP.arrows[c.arrow].png))); });
+    prewarmP = Promise.all(list);
+    return prewarmP;
+  }
+  window.setTimeout(prewarmStoryStart, 400);
+
+  // 1st button — back one step (first dialogue goes back to the intro).
+  function storyBack() {
+    Sfx.play("click");
+    let prev = story.stack.pop();
+    while (prev && STEPS[prev] && STEPS[prev].transient) prev = story.stack.pop();   // auto screens (변신 효과) are skipped
+    if (!prev) {
+      resetStoryText();
+      story.phase = null;
+      state.history = [];
+      transitionTo("envelope", showIntroEnd);
+      return;
+    }
+    const to = STEPS[prev], from = STEPS[story.phase];
+    if (to.route !== from.route) {
+      transitionTo("story", () => enterStep(prev, { settled: true, instant: true }));
+    } else {
+      enterStep(prev, { settled: true });
+    }
+  }
+  // 3rd button — back to the very start: the invitation-flies-in intro again.
+  function storyUndo() {
+    Sfx.play("click");
+    resetStoryText();
+    story.phase = null; story.stack = [];
+    state.route = null; state.stylePicked = null; state.accessoryPicked = new Set(); state.history = [];
+    transitionTo("envelope", () => { window.LetterScene.stop(); resetEnvelopeScene(); });
+  }
+  const sceneLetter = document.getElementById("scene-letter");
+  document.getElementById("letterBg").addEventListener("load", () => layoutPhotoScene(sceneLetter));
+  document.getElementById("letterBack").addEventListener("click", letterBack);
+  document.getElementById("letterMute").addEventListener("click", toggleMute);
+  document.getElementById("letterUndo").addEventListener("click", storyUndo);
+  // 선물받기: 버튼음 + 상품 페이지(D.story.giftUrl)를 새 탭으로 연다 (새 탭이 막히면 같은 탭에서 이동)
+  window.LetterScene.onGift = () => {
+    Sfx.play("click");
+    const url = ST.giftUrl;
+    if (!url) return;
+    const w = window.open(url, "_blank", "noopener");
+    if (!w) window.location.href = url;
+  };
+  window.LetterScene.onRetry = storyUndo;                                   // 다시하기: the whole game from the start
+  document.getElementById("storyBack").addEventListener("click", storyBack);
+  document.getElementById("storyMute").addEventListener("click", toggleMute);
+  document.getElementById("storyUndo").addEventListener("click", storyUndo);
+
+  // ==========================================================================
+  // SCENE: styling-tool puzzle (photo scene)
+  // ==========================================================================
+
+  const sceneStyle = document.getElementById("scene-style");
+  const styleImg = document.getElementById("styleImg");
+  const styleFxLayer = document.getElementById("styleFxLayer");
+  const styleWrongBtn = document.getElementById("styleWrongBtn");
+  const styleCorrectBtn = document.getElementById("styleCorrectBtn");
+  const styleNextBtn = document.getElementById("styleNextBtn");
+
+  function initStyleScene() {
+    const route = currentRoute();
+    state.stylePicked = null;
+    styleFxLayer.innerHTML = "";
+    styleNextBtn.classList.add("hidden");
+    styleWrongBtn.classList.remove("disabled");
+    styleCorrectBtn.classList.remove("disabled");
+    setSceneImage(sceneStyle, route.style.img);
+  }
+
+  function spawnSparkMarks() {
+    const positions = [{ x: 0.62, y: 0.10 }, { x: 0.38, y: 0.17 }];
+    positions.forEach((p, i) => {
+      const el = document.createElement("span");
+      el.className = "spark-mark";
+      el.textContent = "✺";
+      el.style.left = `calc(${p.x * 100}% - 11px)`;
+      el.style.top = `calc(${p.y * 100}% - 11px)`;
+      el.style.animationDelay = `${i * 70}ms`;
+      styleFxLayer.appendChild(el);
+      window.setTimeout(() => el.remove(), 700);
+    });
+  }
+
+  function showNoticePopup(text) {
+    const popup = document.createElement("div");
+    popup.className = "notice-popup";
+    popup.innerHTML = `<span class="notice-tab">Notice</span><p>${text}</p>`;
+    styleFxLayer.appendChild(popup);
+    requestAnimationFrame(() => popup.classList.add("show"));
+    window.setTimeout(() => {
+      popup.classList.remove("show");
+      window.setTimeout(() => popup.remove(), 350);
+    }, 1900);
+  }
+
+  function tintWrongCard() {
+    const tint = document.createElement("div");
+    tint.className = "card-tint";
+    tint.dataset.rect = "cardRight";
+    styleFxLayer.appendChild(tint);
+    positionOnRect(sceneStyle, tint, "cardRight");
+    requestAnimationFrame(() => tint.classList.add("show"));
+    window.setTimeout(() => {
+      tint.classList.remove("show");
+      window.setTimeout(() => tint.remove(), 300);
+    }, 1900);
+  }
+
+  function ringCorrectCard() {
+    const ring = document.createElement("div");
+    ring.className = "correct-ring";
+    ring.dataset.rect = "cardLeft";
+    styleFxLayer.appendChild(ring);
+    positionOnRect(sceneStyle, ring, "cardLeft");
+    requestAnimationFrame(() => ring.classList.add("show"));
+  }
+
+  styleWrongBtn.addEventListener("click", () => {
+    if (state.stylePicked === "correct") return;
+    const route = currentRoute();
+    spawnSparkMarks();
+
+    if (route.style.wrongImg) {
+      // A dedicated composite exists (art + Notice popup already baked in)
+      const base = route.style.img;
+      setSceneImage(sceneStyle, route.style.wrongImg);
+      window.setTimeout(() => {
+        if (currentSceneId() === "style" && state.stylePicked !== "correct") {
+          setSceneImage(sceneStyle, base);
+        }
+      }, 1900);
+    } else {
+      // No dedicated composite yet for this route — draw the feedback.
+      tintWrongCard();
+      showNoticePopup(route.style.wrongBubble);
+    }
+  });
+
+  styleCorrectBtn.addEventListener("click", () => {
+    if (state.stylePicked === "correct") return;
+    state.stylePicked = "correct";
+    const route = currentRoute();
+    ringCorrectCard();
+    showToast(route.style.correctBubble, 3200);
+    styleWrongBtn.classList.add("disabled");
+    styleCorrectBtn.classList.add("disabled");
+    styleNextBtn.classList.remove("hidden");
+  });
+
+  styleNextBtn.addEventListener("click", () => transitionTo("accessory", initAccessoryScene));
+
+  sceneStyle.querySelector('[data-rect="ctrlMute"]').addEventListener("click", toggleMute);
+  sceneStyle.querySelector('[data-rect="ctrlBack"]').addEventListener("click", goBack);
+  sceneStyle.querySelector('[data-rect="ctrlUndo"]').addEventListener("click", () => {
+    if (currentSceneId() === "style") initStyleScene();
+  });
+
+  // ==========================================================================
+  // SCENE: accessory collection — placeholder until real photos arrive
+  // ==========================================================================
+
+  const accessoryBg = document.getElementById("accessoryBg");
+  const accessoryPlaceholderLabel = document.getElementById("accessoryPlaceholderLabel");
+  const accessoryBubble = document.getElementById("accessoryBubble");
+  const accessoryBubbleText = document.getElementById("accessoryBubbleText");
+  const accessoryButtons = document.getElementById("accessoryButtons");
+  const accessoryNextBtn = document.getElementById("accessoryNextBtn");
+
+  const PLACEHOLDER_ACCESSORIES = [
+    { id: "scrunchie", label: "스크런치", bubble: "마음에 들어! 이건 파우치로도 쓸 수 있나봐! 다른 것도 봐볼까?" },
+    { id: "diary", label: "다이어리 파우치", bubble: "이제 파티에 갈 준비 끝이야!" },
+  ];
+
+  function initAccessoryScene() {
+    const route = currentRoute();
+    accessoryBg.className = "stage-bg textured";
+    accessoryBg.style.backgroundColor = route.accent;
+    accessoryPlaceholderLabel.textContent = D.accessory.prompt;
+    state.accessoryPicked = new Set();
+    hideBubble(accessoryBubble);
+    accessoryNextBtn.classList.add("hidden");
+    accessoryButtons.innerHTML = "";
+    PLACEHOLDER_ACCESSORIES.forEach((item) => {
+      const btn = document.createElement("button");
+      btn.className = "item-btn";
+      btn.innerHTML = `<span class="item-swatch"></span><span class="item-label">${item.label}</span>`;
+      btn.dataset.itemId = item.id;
+      btn.addEventListener("click", () => pickAccessory(item));
+      accessoryButtons.appendChild(btn);
+    });
+  }
+
+  function pickAccessory(item) {
+    if (state.accessoryPicked.has(item.id)) return;
+    state.accessoryPicked.add(item.id);
+    showBubble(accessoryBubble, accessoryBubbleText, item.bubble);
+    const btn = accessoryButtons.querySelector(`[data-item-id="${item.id}"]`);
+    if (btn) btn.classList.add("disabled", "selected");
+    if (state.accessoryPicked.size >= PLACEHOLDER_ACCESSORIES.length) {
+      window.setTimeout(() => accessoryNextBtn.classList.remove("hidden"), 500);
+    }
+  }
+
+  accessoryNextBtn.addEventListener("click", () => transitionTo("curtain", initCurtainScene));
+
+  // ==========================================================================
+  // SCENE: curtain reveal
+  // ==========================================================================
+
+  const curtainScene = document.getElementById("scene-curtain");
+  const curtainBg = document.getElementById("curtainBg");
+
+  function initCurtainScene() {
+    curtainScene.classList.remove("opened");
+    curtainBg.className = "stage-bg";
+    curtainBg.style.backgroundColor = D.curtain.fallbackColor;
+    window.setTimeout(() => {
+      curtainScene.classList.add("opened");
+      window.setTimeout(() => transitionTo("ending", initEndingScene), 1000);
+    }, 600);
+  }
+
+  // ==========================================================================
+  // SCENE: ending + retry — placeholder until real photos arrive
+  // ==========================================================================
+
+  const endingBg = document.getElementById("endingBg");
+  const endingBubble = document.getElementById("endingBubble");
+  const endingBubbleText = document.getElementById("endingBubbleText");
+  const btnRetry = document.getElementById("btnRetry");
+
+  function initEndingScene() {
+    const route = currentRoute();
+    endingBg.className = "stage-bg textured";
+    endingBg.style.backgroundColor = route.accent;
+    hideBubble(endingBubble);
+    btnRetry.classList.remove("show");
+    btnRetry.classList.add("hidden");
+    btnRetry.textContent = D.ending.retryLabel;
+    window.setTimeout(() => {
+      showBubble(endingBubble, endingBubbleText, D.ending.thankYouBubble, { autoHideMs: 3000 });
+      window.setTimeout(() => {
+        btnRetry.classList.remove("hidden");
+        requestAnimationFrame(() => btnRetry.classList.add("show"));
+      }, 3000);
+    }, 500);
+  }
+
+  btnRetry.addEventListener("click", () => {
+    state.route = null;
+    state.stylePicked = null;
+    state.accessoryPicked = new Set();
+    state.history = [];
+    transitionTo("envelope", resetEnvelopeScene);
+  });
+
+  // ==========================================================================
+  // TOP-LEFT CONTROLS: back / mute / undo-this-screen
+  // ==========================================================================
+  // Route & style scenes use the baked-in icons (hotspots above); accessory/
+  // curtain/ending (still placeholders) use the generic floating control bar.
+
+  const btnBack = document.getElementById("btnBack");
+  const btnMute = document.getElementById("btnMute");
+  const btnUndo = document.getElementById("btnUndo");
+  const muteGlyph = document.getElementById("muteGlyph");
+
+  const SCENE_INIT = {
+    envelope: showIntroEnd,
+    story: () => { story.stack = []; story.phase = null; enterStep("invite", { settled: true, instant: true }); },
+    style: initStyleScene,
+    accessory: initAccessoryScene,
+    curtain: initCurtainScene,
+    ending: initEndingScene,
+  };
+
+  function goBack() {
+    const prev = state.history.pop();
+    if (!prev) return;
+    showSceneRaw(prev);
+    if (SCENE_INIT[prev]) SCENE_INIT[prev]();
+  }
+
+  window.PartyGame = window.PartyGame || {};
+  window.PartyGame.music = Music;                        // (테스트/디버그용)
+  window.PartyGame.story = story;                        // (테스트/디버그용)
+  function startMusic() { Music.kick(); }
+  // Browsers only allow audio after a user gesture → start on the first touch.
+  // 화면 로드 시 자동 재생을 먼저 시도하고(브라우저가 허용하면 바로 재생), 막혀 있으면 첫 터치/클릭/키/스크롤 순간에 시작한다.
+  // (터치는 pointerdown 이 아니라 touchend/click 시점에 '사용자 동작'으로 인정되므로 여러 이벤트를 모두 듣는다. kick 은 이미 재생 중이면 아무것도 안 한다.)
+  ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup", "click", "keydown", "wheel"].forEach((ev) =>
+    document.addEventListener(ev, startMusic, { capture: true, passive: true }));
+  window.addEventListener("load", startMusic);
+  window.addEventListener("pageshow", startMusic);
+
+  function toggleMute() {
+    state.muted = !state.muted;
+    app.classList.toggle("muted", state.muted);
+    muteGlyph.textContent = state.muted ? "✕" : "♪";
+    const label = state.muted ? "음악 켜기" : "음악 끄기";
+    btnMute.setAttribute("aria-label", label);
+    document.getElementById("storyMute").setAttribute("aria-label", label);
+    document.getElementById("letterMute").setAttribute("aria-label", label);
+    Music.setMuted(state.muted);
+    if (state.muted) Sfx.stopAll(); else Sfx.play("click");
+  }
+
+  function undoCurrentScreen() {
+    const id = currentSceneId();
+    if (SCENE_INIT[id]) SCENE_INIT[id]();
+  }
+
+  btnBack.addEventListener("click", goBack);
+  btnMute.addEventListener("click", toggleMute);
+  btnUndo.addEventListener("click", undoCurrentScreen);
+
+})();
