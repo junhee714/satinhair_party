@@ -686,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=34`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=35`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -758,7 +758,7 @@
       const keys = [];
       const addStep = (sid) => {
         const st = sid && STEPS[sid];
-        if (st && st.frames) keys.push(st.frames[0]);
+        if (st && st.frames) { keys.push(st.frames[0]); if (st.from) keys.push(st.from); }
       };
       if (cfg.next) addStep(cfg.next);
       if (cfg.cards) ["L", "R"].forEach((side) => {
@@ -1330,6 +1330,8 @@
     if (!SP.lights[src]) { const im = new Image(); im.src = src; SP.lights[src] = im; }
     return SP.lights[src];
   }
+  // the light layers of the sparkle screens are fetched + decoded ahead of time, so the effect never waits for them
+  window.setTimeout(() => Object.values(STEPS).forEach((c) => { if (c.light) { const im = spLight(c.light); if (im.decode) im.decode().catch(() => {}); } }), 3500);
   function spStop() {
     SP.token++;
     window.cancelAnimationFrame(SP.raf);
@@ -1357,7 +1359,7 @@
       layoutPhotoScene(sceneStory);
       const TOTAL = ST.transform.totalMs;
       const tStart = performance.now();
-      Sfx.play("magic", ST.transform.sfxDelayMs);
+      Sfx.play("magic", C.sfxDelayMs != null ? C.sfxDelayMs : ST.transform.sfxDelayMs);
       const draw = (t) => {
         const ctx = spCtx;
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
@@ -1365,7 +1367,7 @@
         if (from && rq < 1) {
           // 변신: 이전 모습(from) 위로 지나가 아래→위로 서서히 짙어지며 나타남 (투명도 그라데이션이 발끝에서 머리 끝까지 올라감)
           ctx.drawImage(from, 0, 0, W, H);
-          const yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * xfSmooth(rq)), hf = H * C.rampHalf;
+          const yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * 1 - Math.pow(1 - rq, 1.4)), hf = H * C.rampHalf;
           const b2 = SP.buf2.getContext("2d");
           b2.globalCompositeOperation = "source-over"; b2.globalAlpha = 1;
           b2.clearRect(0, 0, W, H);
@@ -1440,7 +1442,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=34";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=35";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
@@ -1570,7 +1572,7 @@
       story.locked = true;
       transitionTo("story", () => {
         story.stack.push(story.phase);
-        enterStep(id, { instant: true, fxDelayMs: SOFT.fxDelayMs != null ? SOFT.fxDelayMs : ST.transform.delayMs });
+        enterStep(id, { instant: true, fxDelayMs: to.fxDelayMs != null ? to.fxDelayMs : SOFT.fxDelayMs != null ? SOFT.fxDelayMs : ST.transform.delayMs });
       }, SOFT);
     } else if (to && to.curtain) {
       curtainOpenTo(id);

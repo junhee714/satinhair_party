@@ -14,7 +14,7 @@
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",
     letter: "letter.webp",
   };
-  const VER = "?v=34";
+  const VER = "?v=35";
   // 테마별 값: 봉투 사진마다 힌지(뚜껑 접히는 선)·모서리 위치와 크기가 달라서, 화면에서 보이는 크기/기울기가 같도록 K·ROT 를 맞춰 둠
   //  K = 레이어 이미지 배율, TL/TR = 힌지 양 끝, BR/BL = 아래쪽 모서리 (닫힌 봉투 사진 기준 px), shade = 열린 봉투 안쪽 색
   const THEMES = {
@@ -33,11 +33,15 @@
   };
   let T = THEMES.blossom, themeName = "blossom";
   const W = 804, H = 1748, S = 2;
+  // 캔버스는 402x874 기준 화면보다 사방으로 PAD(디자인 px)만큼 더 크게 잡아서, 봉투/편지가 기준 화면 가장자리에서 잘리지 않고 화면 끝까지 보이게 함
+  const PADX = 160, PADY = 60;
+  const CW = W + 2 * PADX * S, CH = H + 2 * PADY * S;
 
   const bgImg = document.getElementById("letterBg");
   const icons = document.getElementById("letterIcons");
   const mutePatch = document.getElementById("letterMutePatch");
   const cv = document.getElementById("letterCanvas");
+  cv.width = CW; cv.height = CH;
   const ctx = cv.getContext("2d");
   const gift = document.getElementById("letterGift");
   const retry = document.getElementById("letterRetry");
@@ -127,7 +131,7 @@
     };
   }
   // whole group (envelope + letter): scaled about GP and lifted by GY so it fills the screen above the two buttons
-  const GS = 1.03, GP = { x: 201, y: 110 }, GY = -30.4;
+  const GS = 1.09, GP = { x: 201, y: 110 }, GY = -22;
   function flightTransform(p) {
     ctx.translate(0, GY * S); ctx.translate(GP.x * S, GP.y * S); ctx.scale(GS, GS); ctx.translate(-GP.x * S, -GP.y * S);
     ctx.translate((PIV.x + p.x) * S, (PIV.y + p.y) * S);
@@ -212,7 +216,8 @@
   function draw(t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
-    ctx.clearRect(0, 0, W, H);                                 // the satin background is the <img> underneath
+    ctx.clearRect(0, 0, CW, CH);                               // the satin background is the <img> underneath
+    ctx.translate(PADX * S, PADY * S);
     if (t < FLY0) return;
     const p = pose(t);
     const u = clamp01((t - FLY0) / FLY);
@@ -239,7 +244,7 @@
     const th = themeName;
     cancelAnimationFrame(raf); clearTimeout(startTimer); clearButtons();
     api.playing = true;
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, CW, CH);
     ensure(th).then(() => {
       if (my !== token) return;
       img = imgs[th];
@@ -266,7 +271,7 @@
   function stop() {
     token++; cancelAnimationFrame(raf); clearTimeout(startTimer); clearButtons();
     api.playing = false;
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, CW, CH);
   }
   // final pose, no animation (coming back from another screen)
   function showFinal(name) {
