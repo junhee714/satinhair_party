@@ -66,8 +66,36 @@
   }
 
   // Side bars are two small canvases (just the bars, not the whole screen) → much less memory / redraw work than a full-screen canvas.
+  // Colours of the page edge above / below the picture (shown through the browser's translucent status bar / toolbar on phones).
+  function avgColor(img, x0, y0, x1, y1) {
+    const nw = img.naturalWidth, nh = img.naturalHeight;
+    const cv = document.createElement("canvas"); cv.width = 16; cv.height = 8;
+    const c = cv.getContext("2d");
+    c.drawImage(img, x0 * nw, y0 * nh, (x1 - x0) * nw, (y1 - y0) * nh, 0, 0, 16, 8);
+    const d = c.getImageData(0, 0, 16, 8).data;
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return `rgb(${Math.round(r / n)}, ${Math.round(g / n)}, ${Math.round(b / n)})`;
+  }
+  function applyEdgeColors(sceneEl, img) {
+    if (sceneEl.classList.contains("hidden") || !img.complete || !img.naturalWidth) return;
+    try {
+      if (!img._edge) {
+        const plain = img.id === "introBg";          // (the curtain picture has no corner ornaments)
+        img._edge = {
+          top: plain ? avgColor(img, 0, 0, 1, 0.02) : avgColor(img, 0, 0.10, 1, 0.12),
+          bottom: avgColor(img, 0.3, 0.975, 0.7, 0.995),
+        };
+      }
+      const root = document.documentElement.style;
+      root.setProperty("--edge-top", img._edge.top);
+      root.setProperty("--edge-bottom", img._edge.bottom);
+    } catch (e) { /* canvas read blocked (e.g. file://) → keep the default dark colour */ }
+  }
+
   function drawSideFill(sceneEl, img, L) {
     if (img.tagName !== "IMG") return;
+    applyEdgeColors(sceneEl, img);
     const old = sceneEl.querySelector(":scope > canvas.scene-fill:not(.fill-l):not(.fill-r)");
     if (old) old.remove();
     let cvL = sceneEl.querySelector(":scope > .scene-fill.fill-l"), cvR = sceneEl.querySelector(":scope > .scene-fill.fill-r");

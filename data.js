@@ -45,19 +45,19 @@ window.GAME_DATA = {
   //   fadeInMs / fadeOutMs : 페이드 시간(ms).  story.fadeOutMs 는 마지막 화면(선물받기/다시하기)에 들어갈 때의 페이드아웃,
   //   switchFadeMs : 다른 곡으로 넘어가며 이전 곡이 사라지는 시간 (뒤로 가기 등)
   music: {
-    intro: { src: "assets/audio/intro-bgm.mp3?v=27", volume: 0.7, fadeInMs: 2000, fadeOutMs: 1200 },
-    story: { src: "assets/audio/story-bgm.mp3?v=27", volume: 0.7, fadeInMs: 2500, fadeOutMs: 4500 },
+    intro: { src: "assets/audio/intro-bgm.mp3?v=28", volume: 0.7, fadeInMs: 2000, fadeOutMs: 1200 },
+    story: { src: "assets/audio/story-bgm.mp3?v=28", volume: 0.7, fadeInMs: 2500, fadeOutMs: 4500 },
     switchFadeMs: 900,
   // 효과음 (♪ 음악 끄기 상태에서는 함께 꺼집니다).  volume 0~1, 파일은 assets/audio/sfx/
   //   click: 너드 지나부터 모든 버튼   magic: 루트 선택(블라썸1/선셋1) · 변신(11, 18)   comb: 꼬리빗 선택
   //   shine: 커튼이 닫혔다 열릴 때(커튼 속도에 맞춰 1.9초)   wind: 편지 화면에서 초대장이 날아올 때(날아오는 속도에 맞춘 바람)
   sfx: {
-    click: { src: "assets/audio/sfx/click.mp3?v=27", volume: 0.6 },
-    magic: { src: "assets/audio/sfx/magic.mp3?v=27", volume: 0.8 },
-    comb:  { src: "assets/audio/sfx/comb.mp3?v=27",  volume: 0.9 },
-    shine: { src: "assets/audio/sfx/shine.mp3?v=27", volume: 0.8 },
-    wind:  { src: "assets/audio/sfx/wind.mp3?v=27",  volume: 1.0, delayMs: 100 },   // delayMs: 편지 화면의 흰 페이드가 걷히며 날아오는 모습이 보이는 시점에 맞춤
-    glow:  { src: "assets/audio/sfx/glow.mp3?v=27",  volume: 0.8 },                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
+    click: { src: "assets/audio/sfx/click.mp3?v=28", volume: 0.6 },
+    magic: { src: "assets/audio/sfx/magic.mp3?v=28", volume: 0.8 },
+    comb:  { src: "assets/audio/sfx/comb.mp3?v=28",  volume: 0.9 },
+    shine: { src: "assets/audio/sfx/shine.mp3?v=28", volume: 0.8 },
+    wind:  { src: "assets/audio/sfx/wind.mp3?v=28",  volume: 1.0, delayMs: 100 },   // delayMs: 편지 화면의 흰 페이드가 걷히며 날아오는 모습이 보이는 시점에 맞춤
+    glow:  { src: "assets/audio/sfx/glow.mp3?v=28",  volume: 0.8 },                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
   },
   crossFadeMs: 1800,          // "초대장 받기" → 너드 지나: 첫 곡이 사라지는 시간 (두 번째 곡 페이드인과 겹침)
   },
