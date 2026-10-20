@@ -200,7 +200,7 @@
     // curtain picture behind it covers the whole screen. If the screen is too short for the envelope + letter, the content is shrunk to fit.
     if (sceneEl.id === "scene-envelope") {
       const CT = 170, CH = 590;                                   // design px: top of the letter .. bottom of the envelope
-      const sc = Math.min(boxW / 402, (boxH - 24) / CH);
+      const sc = Math.min((boxW / 402) * (D.introScale || 0.88), (boxH - 24) / CH);   // introScale (data.js): 1 = letter nearly edge to edge, smaller = more side margin
       renderW = 402 * sc; renderH = 874 * sc;
       offsetX = (boxW - renderW) / 2; offsetY = (boxH - renderH) / 2;
       const bottom = offsetY + (CT + CH) * sc;
@@ -617,6 +617,7 @@
 
   // 첫 화면: 봉투가 날아오기 시작할 때 바람 소리 (오디오가 아직 잠겨 있으면 늦게 틀지 않고 건너뜀 — 아이폰은 화면을 한 번 터치해야 소리가 열려요)
   window.IntroScene.onStart = () => Sfx.play("wind", 0, { onlyIfRunning: true });
+  window.IntroScene.onLetter = () => Sfx.play("wind", 0, { onlyIfRunning: true });   // 봉투 뚜껑이 열리고 편지지가 올라올 때 한 번 더
   resetEnvelopeScene();
 
   // ==========================================================================
@@ -656,7 +657,7 @@
   const glossTmpCtx = glossTmp.getContext("2d");
   const glossImgs = { soft: new Image(), glint: new Image() };
   glossImgs.soft.src = (window.FX_MAP && window.FX_MAP.hairMask) || "assets/fx/hair-mask.png";
-  glossImgs.glint.src = "assets/fx/hair-glint.png";
+  glossImgs.glint.src = (window.FX_MAP && window.FX_MAP.hairGlint) || "assets/fx/hair-glint.png";
   // 선셋 허니 루트: 자기 머리 모양 마스크
   const glossImgsSun = { soft: new Image(), glint: new Image() };
   glossImgsSun.soft.src = (window.FX_MAP_SUN && window.FX_MAP_SUN.hairMask) || "assets/fx/sn-hair-mask.png";
@@ -681,7 +682,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=30`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=31`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1313,6 +1314,86 @@
   }
 
   // ==========================================================================
+  // 블썸 11 (와이드 그림 버전): 디자이너가 만든 반짝임 그림을 그대로 씁니다.
+  //   assets/fx/w-sparkle12.webp = (반짝임 있는 그림 - 깨끗한 그림) 의 '빛 레이어'. 지나 뒤에서만 빛나고 지나 위(0)는 비어 있습니다.
+  //   깨끗한 그림 위에 빛이 서서히 차오르고(bloom), 밝은 띠가 아래→위로 한 번 훑고 지나가며, 마지막에 서서히 사라집니다 (data.js story.sparkle).
+  // ==========================================================================
+  const spLayer = document.getElementById("spLayer");
+  const spCanvas = document.getElementById("spCanvas");
+  const spCtx = spCanvas.getContext("2d");
+  const SP = { raf: 0, token: 0, lights: {}, buf: null };
+  function spLight(src) {
+    if (!SP.lights[src]) { const im = new Image(); im.src = src; SP.lights[src] = im; }
+    return SP.lights[src];
+  }
+  function spStop() {
+    SP.token++;
+    window.cancelAnimationFrame(SP.raf);
+    spLayer.classList.remove("on");
+  }
+  function spRun(onEnd, baseKey, lightSrc) {
+    spStop();
+    const my = SP.token, C = ST.sparkle;
+    const base = imgByKey[baseKey], light = spLight(lightSrc);
+    const t0 = performance.now();
+    const waitReady = () => {
+      if (my !== SP.token) return;
+      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth;
+      if (!ok) {
+        if (performance.now() - t0 > 3000) { if (onEnd) onEnd(); return; }       // assets missing: just move on
+        SP.raf = window.requestAnimationFrame(waitReady);
+        return;
+      }
+      const W = base.naturalWidth, H = base.naturalHeight;
+      if (spCanvas.width !== W || spCanvas.height !== H) { spCanvas.width = W; spCanvas.height = H; }
+      if (!SP.buf || SP.buf.width !== W || SP.buf.height !== H) { SP.buf = document.createElement("canvas"); SP.buf.width = W; SP.buf.height = H; }
+      const bctx = SP.buf.getContext("2d");
+      spLayer.classList.add("on");
+      layoutPhotoScene(sceneStory);
+      const TOTAL = ST.transform.totalMs;
+      const tStart = performance.now();
+      Sfx.play("magic", ST.transform.sfxDelayMs);
+      const draw = (t) => {
+        const ctx = spCtx;
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+        ctx.drawImage(base, 0, 0, W, H);
+        const m = t - C.startDelayMs;
+        if (m <= 0 || m >= C.fadeMs[1]) return;
+        const bloom = xfSmooth(m / C.bloomMs);
+        const fade = 1 - xfSmooth((m - C.fadeMs[0]) / (C.fadeMs[1] - C.fadeMs[0]));
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = C.baseGain * bloom * fade;
+        ctx.drawImage(light, 0, 0, W, H);
+        const q = xfClamp((m - C.bandMs[0]) / (C.bandMs[1] - C.bandMs[0]));
+        if (q > 0 && q < 1) {                                   // one brighter band that runs up the spiral
+          const yc = H * (C.bandFrom + (C.bandTo - C.bandFrom) * xfSmooth(q)), half = H * C.bandHalf;
+          bctx.globalCompositeOperation = "source-over"; bctx.globalAlpha = 1;
+          bctx.clearRect(0, 0, W, H);
+          bctx.drawImage(light, 0, 0, W, H);
+          const gr = bctx.createLinearGradient(0, yc - half, 0, yc + half);
+          gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+          bctx.globalCompositeOperation = "destination-in";
+          bctx.fillStyle = gr; bctx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = C.bandGain * fade * Math.sin(Math.PI * q);
+          ctx.drawImage(SP.buf, 0, 0, W, H);
+        }
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+      };
+      draw(0);
+      const tick = (now) => {
+        if (my !== SP.token) return;
+        const t = now - tStart;
+        draw(Math.min(t, TOTAL));
+        if (t < TOTAL) { SP.raf = window.requestAnimationFrame(tick); return; }
+        spLayer.classList.remove("on");
+        if (onEnd) onEnd();
+      };
+      SP.raf = window.requestAnimationFrame(tick);
+    };
+    waitReady();
+  }
+
+  // ==========================================================================
   // 블썸 21 → 22: the curtain closes over the picture, then its two halves gather to the sides
   // ==========================================================================
   const curtainLayer = document.getElementById("curtainLayer");
@@ -1374,14 +1455,17 @@
     stopMarks(soft);
     glossStop();
     xfStop();
+    spStop();
   }
 
   function enterStep(id, { settled = false, instant = false, textDelayMs = null, fxDelayMs = null, fadeMs = null } = {}) {
     const cfg = STEPS[id];
     if (!cfg) return;
     clearStoryTimers();
-    stopSway();
-    stopFxAll(!instant);
+    // keepFx: the same wobbling poses + 빠직 marks go on across two captions (오답: "이게 아니야!" → "다른 아이템을 선택해 볼까?")
+    const prevCfg = story.phase && STEPS[story.phase];
+    const keep = !!(cfg.keepFx && prevCfg && prevCfg.fx === cfg.fx && prevCfg.route === cfg.route && !settled && !instant && story.marks.length);
+    if (!keep) { stopSway(); stopFxAll(!instant); }
     window.clearTimeout(story.patchTimer);
     story.phase = id;
     story.ready = false;
@@ -1403,7 +1487,7 @@
     const frames = cfg.frames;
     // reveal: the picture first shows frames[0] (e.g. with sparkles), then slowly melts into reveal.to
     const RV = cfg.reveal || null;
-    storyShow(RV && settled ? RV.to : frames[0], { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
+    if (!keep) storyShow(RV && settled ? RV.to : frames[0], { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
     let revealTextDelay = null;
     if (RV && !settled) {
       const base = instant ? 0 : ST.fadeMs;
@@ -1432,7 +1516,7 @@
       storyLater(() => glossRun(() => { glossDone = true; tryFinish(); }), instant ? 0 : TY.afterFadeMs);
     }
     if (live && cfg.kind === "transform") {
-      storyLater(() => xfRun(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.char, cfg.tint), fxDelayMs != null ? fxDelayMs : 0);
+      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.tint), fxDelayMs != null ? fxDelayMs : 0);
     }
     if (cfg.text) {
       if (settled) typerShow(cfg.text, { instant: true, onDone: done });
@@ -1444,9 +1528,9 @@
       done();
     }
 
-    if (cfg.sway && frames.length > 1) startSway(frames);
+    if (cfg.sway && frames.length > 1 && !keep) startSway(frames);
     if (cfg.fx === "petals" && !settled) storyLater(spawnPetals, fxDelayMs != null ? fxDelayMs : instant ? 120 : 200);
-    if (cfg.fx === "marks") storyLater(() => startMarks({ pop: !settled }), settled ? 0 : ST.marks.startDelayMs);
+    if (cfg.fx === "marks" && !keep) storyLater(() => startMarks({ pop: !settled }), settled ? 0 : ST.marks.startDelayMs);
     if (cfg.kind === "result") storyLater(() => showToast(ST.endToast, 2600, "top"), 1100);
   }
 
@@ -1515,7 +1599,7 @@
       if ((ev.clientY - r.top) / r.height < 0.76) pickCard(cfg.tapGo, true);          // (not on the card tray: a tap on the wrong card stays a no-op)
       return;
     }
-    if (cfg.kind === "choice" || cfg.kind === "wrong" || !story.ready) return;
+    if (cfg.kind === "choice" || (cfg.kind === "wrong" && !cfg.next) || !story.ready) return;
     advance(cfg);                                           // (자막 탭에는 효과음 없음 — 버튼에만)
   });
 

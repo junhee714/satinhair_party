@@ -820,6 +820,9 @@ body::before, body::after { content: none; }
 .xf-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; display: none; overflow: hidden; }
 .xf-layer.on { display: block; }
 .xf-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+.sp-layer { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; display: none; overflow: hidden; }
+.sp-layer.on { display: block; }
+.sp-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
 
 /* 커튼: two halves (clip 49.8% so there is no seam), blocks all taps while it is on screen */
 .curtain-layer { position: absolute; inset: 0; z-index: 30; overflow: hidden; display: none; opacity: 0; pointer-events: none; transition: opacity var(--cur-in, 420ms) ease; }

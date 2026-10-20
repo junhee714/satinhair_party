@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>지나의 파티 준비</title>
 <meta name="description" content="지나를 파티에 보내는 아이템 입히기 게임 프로토타입" />
-<link rel="stylesheet" href="styles.css?v=30" />
+<link rel="stylesheet" href="styles.css?v=31" />
 </head>
 <body>
   <div class="app" id="app">
@@ -51,6 +51,10 @@
       <!-- 블썸 11: sparkle spiral behind Jina (behind-transform test v7), drawn on a canvas -->
       <div class="xf-layer" id="xfLayer" data-rect="storyFull">
         <canvas class="xf-canvas" id="xfCanvas" width="804" height="1748"></canvas>
+      </div>
+      <!-- 블썸 11 (와이드 그림): designer's sparkle light layer, drawn on a canvas that covers the whole wide picture -->
+      <div class="sp-layer" id="spLayer" data-rect="storyWide">
+        <canvas class="sp-canvas" id="spCanvas" width="1040" height="1748"></canvas>
       </div>
       <!-- petals, 빠직 marks and the pressed-card patches (sprites from assets/fx) -->
       <div class="story-fx" id="storyFx" data-rect="storyFull"></div>
@@ -141,12 +145,12 @@
   </div>
 
 
-  <script src="data.js?v=30"></script>
-  <script src="assets/text/dialogue-map.js?v=30"></script>
-  <script src="assets/fx/fx-map.js?v=30"></script>
+  <script src="data.js?v=33"></script>
+  <script src="assets/text/dialogue-map.js?v=31"></script>
+  <script src="assets/fx/fx-map.js?v=31"></script>
   <script src="assets/fx/fx-map-sun.js?v=30"></script>
   <script src="letter.js?v=30"></script>
-  <script src="intro.js?v=30"></script>
-  <script src="script.js?v=30"></script>
+  <script src="intro.js?v=31"></script>
+  <script src="script.js?v=33"></script>
 </body>
 </html>

@@ -25,6 +25,8 @@ window.HOTSPOT_RECTS = {
   cardRight: { x: 0.514925, y: 0.749428, w: 0.450249, h: 0.223112 },
   // ---- 너드 지나 스토리 화면 (1675x3642 원본 이미지에서 실측, 0~1 비율) ----
   storyFull:      { x: 0, y: 0, w: 1, h: 1 },
+  // 와이드 캔버스(520x874) 전체: 기준 화면(402x874) 좌우로 여분 배경(bleed)이 있는 그림 위에 얹는 레이어용
+  storyWide:      { x: -0.146766, y: 0, w: 1.293532, h: 1 },
   storyBack:      { x: 0.0917, y: 0.0405, w: 0.1240, h: 0.0580 },
   storyMute:      { x: 0.2500, y: 0.0405, w: 0.1240, h: 0.0580 },
   storyUndo:      { x: 0.3986, y: 0.0405, w: 0.1240, h: 0.0580 },
@@ -40,6 +42,10 @@ window.HOTSPOT_RECTS = {
 };
 
 window.GAME_DATA = {
+  // 첫 화면(봉투+편지지)의 크기: 1 = 화면 폭에 거의 꽉 참(402 기준 원래 디자인), 작을수록 좌우 여백이 커짐 (지금 0.88)
+  introScale: 0.88,
+  // 첫 화면 두 번째 바람 소리(봉투가 열리고 편지지를 꺼낼 때)가 시작되는 시점 — 인트로 시작 후 ms (편지지가 올라오기 시작하는 3050ms 보다 약간 앞)
+  introWindLetterMs: 2700,
   // 2번째 버튼으로 끄고 켤 수 있어요. 파일이 없으면 조용히 무시됩니다.
   // 배경음악 (왼쪽 위 ♪ 버튼으로 끄고 켬).  intro = 첫 화면(초대장), story = 너드 지나부터 편지 화면 직전까지.
   //   fadeInMs / fadeOutMs : 페이드 시간(ms).  story.fadeOutMs 는 마지막 화면(선물받기/다시하기)에 들어갈 때의 페이드아웃,
@@ -102,7 +108,8 @@ window.GAME_DATA = {
     ],
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
-    wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7"] },
+    wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
+                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
       // nerd: 넓은 그림(와이드 캔버스)을 쓰는 루트. rects = 이 루트에서만 쓰는 버튼/카드 위치 (402x874 기준 0~1 비율; 위의 HOTSPOT_RECTS 를 덮어씀)
@@ -113,8 +120,10 @@ window.GAME_DATA = {
                           storyMutePatch: { x: 0.152292, y: 0.059857, w: 0.120578, h: 0.054091 },
                           storyCardL: { x: 0.165425, y: 0.75453, w: 0.327114, h: 0.221307 },
                           storyCardR: { x: 0.506268, y: 0.754256, w: 0.3104, h: 0.221582 } } },
-      blossom: { prefix: "bl",   fill: "bl-3",   mute: "assets/scenes/mute-on-patch-pink.png" },
-      party:   { prefix: "bl",   fill: "bl-12",  mute: "assets/scenes/mute-on-patch-pink.png" },   // 블썸 11~20 (드레스룸)
+      // blossom: 블썸 1~10 (와이드 그림). 버튼/카드 위치는 너드 루트와 같은 템플릿이라 rects 를 그대로 씁니다.
+      blossom: { prefix: "bl",   fill: "bl-3",   wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },
+      partyA:  { prefix: "bl",   fill: "bl-12",  wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },   // 블썸 11 (드레스룸 반짝임, 와이드)
+      party:   { prefix: "bl",   fill: "bl-13",  mute: "assets/scenes/mute-on-patch-pink.png" },   // 블썸 13~20 (드레스룸) — 아직 이전 그림
       sunset:  { prefix: "sn",   fill: "sn-fill",   mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 허니 루트
       sparty:  { prefix: "sn",   fill: "sn-12",     mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 11~20 (드레스룸)
       shall:   { prefix: "sn",   fill: "sn-22",     mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 22~24 (파티장)
@@ -126,6 +135,9 @@ window.GAME_DATA = {
     afterFx: { fadeMs: 180, textDelayMs: 40 },
     //  routeStart: 너드 지나 5 의 카드(go:"@...")를 누르면 처음 들어가는 화면
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },
+    // 블썸 11 (와이드 반짝임 그림): 빛이 차오르고(bloomMs) → 밝은 띠가 아래→위로 한 번 훑고(bandMs, 그림 높이 비율 bandFrom→bandTo, 폭 bandHalf) → 사라짐(fadeMs).  totalMs 는 아래 transform 과 같이 씀
+    //  baseGain 빛 전체 세기(1 = 디자인 원본 밝기), bandGain 띠가 지나갈 때 더해지는 밝기
+    sparkle: { startDelayMs: 200, bloomMs: 500, baseGain: 1.0, bandGain: 0.6, bandMs: [200, 1400], bandFrom: 0.8, bandTo: 0.02, bandHalf: 0.2, fadeMs: [1350, 2150] },
     transform: { sfxDelayMs: 250, delayMs: 300, strength: 0.72, totalMs: 2200, light: "assets/fx/sparkle-light.webp", char: "assets/fx/sparkle-char.png" },
     // 블썸 21→22: 커튼이 닫혀 있다가(fadeInMs 로 덮임) holdMs 뒤 양옆으로 걷히며(openMs) 파티장이 나타남. 자막은 커튼이 거의 걷힌 뒤 시작.
     curtain: { sfxPeakMs: 300, fadeInMs: 260, holdMs: 200, openMs: 1050, ease: "cubic-bezier(.5,0,.3,1)", textAtOpenFrac: 0.7 },
@@ -171,23 +183,26 @@ window.GAME_DATA = {
       sh24: { route: "shall", kind: "dialogue", frames: ["sn-24"], text: "SQ", arrow: "SAZ", next: null, toLetter: true },
 
       // ---- 블라썸 지나 ----
-      bl1: { route: "blossom", kind: "dialogue", frames: ["bl-1"], text: "D", arrow: "D", fx: "petals", next: "bl2" },
-      bl2: { route: "blossom", kind: "dialogue", frames: ["bl-2"], text: "E", arrow: "E", next: "bl3" },
+      bl1: { route: "blossom", kind: "dialogue", frames: ["bl-1"], text: "WD", arrow: "W", fx: "petals", next: "bl2" },
+      bl2: { route: "blossom", kind: "dialogue", frames: ["bl-2"], text: "WE", arrow: "W", next: "bl3" },
       // 고데기 브러쉬(왼쪽) = 정답, 꼬리빗(오른쪽) = 오답
-      bl3: { route: "blossom", kind: "choice",   frames: ["bl-3"], text: "F",
+      bl3: { route: "blossom", kind: "choice",   frames: ["bl-3"], text: "WF",
              cards: { L: { go: "bl8" }, R: { go: "wrong", sfx: "comb" } } },
-      // 오답: 지나가 좌우로 흔들리고 빠직 마크가 계속 움직이며 "다른 아이템을 선택해 볼까?" 자막이 나옴.
-      // 왼쪽 카드를 누르면 바로 정답으로, 오른쪽 카드를 또 누르면 빠직이 다시 팝!
-      wrong: { route: "blossom", kind: "wrong",  frames: ["bl-4", "bl-5"], sway: true, text: "R", fx: "marks",
+      // 오답: 지나가 좌우로 흔들리고 빠직 마크가 계속 움직이며 "이게 아니야! 이 꼬리빗만으로는 어려워!" 자막(▶)이 나옴.
+      //  ▶ 탭 → 같은 화면에서 자막만 "다른 아이템을 선택해 볼까?" 로 바뀜 (흔들림·빠직은 끊기지 않고 이어짐, keepFx).
+      //  두 자막 모두 왼쪽 카드를 누르면 바로 정답으로, 오른쪽 카드를 또 누르면 빠직이 다시 팝!
+      wrong: { route: "blossom", kind: "wrong",  frames: ["bl-4", "bl-5"], sway: true, text: "WRA", arrow: "W", fx: "marks", next: "wrong2",
+               cards: { L: { go: "bl8" }, R: { again: true, sfx: "comb" } } },
+      wrong2: { route: "blossom", kind: "wrong", frames: ["bl-4", "bl-5"], sway: true, text: "WR", fx: "marks", keepFx: true,
                cards: { L: { go: "bl8" }, R: { again: true, sfx: "comb" } } },
       // 8: 포즈 2장(8a ⇄ 8b)이 탭하기 전까지 번갈아 보이며 좌우로 흔들림
-      bl8: { route: "blossom", kind: "dialogue", frames: ["bl-8a", "bl-8b"], sway: true, text: "G", arrow: "G", next: "bl9" },
+      bl8: { route: "blossom", kind: "dialogue", frames: ["bl-8a", "bl-8b"], sway: true, text: "WG", arrow: "W", next: "bl9" },
       // 9: 자막과 함께 머리 광택이 위에서 아래로 흐르고, 자막·광택이 끝나면 ▶ 깜빡임 → 탭하면 11로
-      bl9: { route: "blossom", kind: "gloss",    frames: ["bl-9"], text: "H", arrow: "E", next: "bl10" },
+      bl9: { route: "blossom", kind: "gloss",    frames: ["bl-9"], text: "WH", arrow: "W", next: "bl10" },
       // 10: ▶ → 탭하면 흰 페이드로 11 (변신 효과) 로
-      bl10: { route: "blossom", kind: "dialogue", frames: ["bl-10"], text: "I", arrow: "D", next: "p11" },
+      bl10: { route: "blossom", kind: "dialogue", frames: ["bl-10"], text: "WI", arrow: "W", next: "p11" },
       // 11: 변신 반짝임 (자막 없음, 끝나면 자동으로 13). veil = 흰색 부드러운 페이드로 들어옴, transient = 되돌리기 때 건너뜀
-      p11: { route: "party", kind: "transform", frames: ["bl-12"], veil: "fast", transient: true, next: "p13" },
+      p11: { route: "partyA", kind: "transform", frames: ["bl-12"], light: "assets/fx/w-sparkle12.webp?v=31", veil: "fast", transient: true, next: "p13" },
       // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림
       p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "J", cardSet: "B", cards: { L: { go: "p15" } } },
       p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "K", arrow: "E", next: "p16" },
@@ -269,3 +284,6 @@ window.GAME_DATA = {
     // { after: "style:correct", src: "assets/media/sparkle-transform.mp4", type: "video" },
   ],
 };
+
+// 블썸(와이드) 루트들은 너드 루트와 같은 버튼/카드 템플릿 → 같은 클릭 영역
+(function () { const R = window.GAME_DATA.story.routes; R.blossom.rects = R.partyA.rects = R.nerd.rects; })();
