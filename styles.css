@@ -797,6 +797,8 @@ body::before, body::after { content: none; }
 
 /* 블썸 11 변신 반짝임: canvas sits over the picture (below the icons' mute patch / hotspots) */
 /* 편지 화면: 봉투/편지지 캔버스 + 선물받기/다시하기 버튼 (위치는 data-rect 로 JS 가 맞춤) */
+#letterBg[data-cover] { object-fit: cover; }
+.letter-icons { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; user-select: none; -webkit-user-drag: none; }
 .letter-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; overflow: hidden; }
 .letter-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
 .letter-pill {

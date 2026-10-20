@@ -35,6 +35,7 @@ window.HOTSPOT_RECTS = {
   // 음악 아이콘의 '사선'을 가려주는 패치 (음악 재생 중일 때 보임)
   storyMutePatch: { x: 0.238806, y: 0.035695, w: 0.149254, h: 0.068644 },
   // 편지 화면의 선물받기 / 다시하기 버튼 (145x42px, 가로 가운데, 145x42px)
+  letterIcons: { x: -0.024397, y: 0.049969, w: 0.469778, h: 0.073307 },   // 편지 화면 위쪽 동그란 아이콘 3개 (블썸, 402x874 기준 비율)
   letterGift:  { x: 0.319652, y: 0.7495, w: 0.360697, h: 0.048055 },
   letterRetry: { x: 0.319652, y: 0.8150, w: 0.360697, h: 0.048055 },
   // 첫 화면 인트로의 '초대장 받기' 버튼: 편지지의 입장 조건 박스 아래, 봉투 입구 안쪽 여백 (138.2x35.5px / 402x874). 선물받기 버튼(145x42)보다 약간 작게
@@ -102,14 +103,14 @@ window.GAME_DATA = {
     images: [
       "nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
       "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10",
-      "bl-12", "bl-13", "bl-15", "bl-16", "bl-18c", "bl-19", "bl-20", "bl-22", "bl-23", "bl-24",
+      "bl-12", "bl-12bg", "bl-13", "bl-13p", "bl-15", "bl-15s", "bl-16", "bl-16p", "bl-19", "bl-19s", "bl-20", "bl-22", "bl-23", "bl-24",
       "sn-1", "sn-2", "sn-3", "sn-4", "sn-5", "sn-8a", "sn-8b", "sn-9", "sn-10", "sn-fill",   // 선셋 허니 루트
       "sn-12", "sn-13", "sn-15", "sn-16", "sn-18c", "sn-19", "sn-20", "sn-21", "sn-22", "sn-23", "sn-24",   // 선셋 11~24
     ],
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
     wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
-                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12"] },
+                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-13p", "bl-15", "bl-15s", "bl-16", "bl-16p", "bl-19", "bl-19s", "bl-20", "bl-22", "bl-23", "bl-24"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
       // nerd: 넓은 그림(와이드 캔버스)을 쓰는 루트. rects = 이 루트에서만 쓰는 버튼/카드 위치 (402x874 기준 0~1 비율; 위의 HOTSPOT_RECTS 를 덮어씀)
@@ -122,12 +123,11 @@ window.GAME_DATA = {
                           storyCardR: { x: 0.506268, y: 0.754256, w: 0.3104, h: 0.221582 } } },
       // blossom: 블썸 1~10 (와이드 그림). 버튼/카드 위치는 너드 루트와 같은 템플릿이라 rects 를 그대로 씁니다.
       blossom: { prefix: "bl",   fill: "bl-3",   wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },
-      partyA:  { prefix: "bl",   fill: "bl-12",  wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },   // 블썸 11 (드레스룸 반짝임, 와이드)
-      party:   { prefix: "bl",   fill: "bl-13",  mute: "assets/scenes/mute-on-patch-pink.png" },   // 블썸 13~20 (드레스룸) — 아직 이전 그림
+      party:   { prefix: "bl",   fill: "bl-13",  wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },   // 블썸 12~20 (드레스룸, 와이드)
       sunset:  { prefix: "sn",   fill: "sn-fill",   mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 허니 루트
       sparty:  { prefix: "sn",   fill: "sn-12",     mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 11~20 (드레스룸)
       shall:   { prefix: "sn",   fill: "sn-22",     mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 22~24 (파티장)
-      hall:    { prefix: "bl",   fill: "bl-22",  mute: "assets/scenes/mute-on-patch-pink.png" },   // 블썸 22~24 (파티장)
+      hall:    { prefix: "bl",   fill: "bl-22",  wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },   // 블썸 22~24 (파티장, 와이드)
     },
     // 블썸 11: "지나 뒤 변신 효과" (behind-transform test v7). 자막 없이 반짝임 소용돌이가 지나 뒤→앞으로 훑고 사라지면 자동으로 다음 화면.
     //  delayMs  흰 페이드가 걷히기 시작한 뒤 효과 시작까지 / strength 반짝임 세기 / totalMs 효과 전체 길이
@@ -137,7 +137,8 @@ window.GAME_DATA = {
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },
     // 블썸 11 (와이드 반짝임 그림): 빛이 차오르고(bloomMs) → 밝은 띠가 아래→위로 한 번 훑고(bandMs, 그림 높이 비율 bandFrom→bandTo, 폭 bandHalf) → 사라짐(fadeMs).  totalMs 는 아래 transform 과 같이 씀
     //  baseGain 빛 전체 세기(1 = 디자인 원본 밝기), bandGain 띠가 지나갈 때 더해지는 밝기
-    sparkle: { startDelayMs: 200, bloomMs: 500, baseGain: 1.0, bandGain: 0.6, bandMs: [200, 1400], bandFrom: 0.8, bandTo: 0.02, bandHalf: 0.2, fadeMs: [1350, 2150] },
+    sparkle: { startDelayMs: 200, bloomMs: 500, baseGain: 1.0, bandGain: 0.6, bandMs: [200, 1400], bandFrom: 0.8, bandTo: 0.02, bandHalf: 0.2, fadeMs: [1350, 2150],
+               rampMs: [200, 1550], rampFrom: 1.1, rampTo: -0.1, rampHalf: 0.16 },
     transform: { sfxDelayMs: 250, delayMs: 300, strength: 0.72, totalMs: 2200, light: "assets/fx/sparkle-light.webp", char: "assets/fx/sparkle-char.png" },
     // 블썸 21→22: 커튼이 닫혀 있다가(fadeInMs 로 덮임) holdMs 뒤 양옆으로 걷히며(openMs) 파티장이 나타남. 자막은 커튼이 거의 걷힌 뒤 시작.
     curtain: { sfxPeakMs: 300, fadeInMs: 260, holdMs: 200, openMs: 1050, ease: "cubic-bezier(.5,0,.3,1)", textAtOpenFrac: 0.7 },
@@ -202,23 +203,23 @@ window.GAME_DATA = {
       // 10: ▶ → 탭하면 흰 페이드로 11 (변신 효과) 로
       bl10: { route: "blossom", kind: "dialogue", frames: ["bl-10"], text: "WI", arrow: "W", next: "p11" },
       // 11: 변신 반짝임 (자막 없음, 끝나면 자동으로 13). veil = 흰색 부드러운 페이드로 들어옴, transient = 되돌리기 때 건너뜀
-      p11: { route: "partyA", kind: "transform", frames: ["bl-12"], light: "assets/fx/w-sparkle12.webp?v=31", veil: "fast", transient: true, next: "p13" },
-      // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림
-      p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "J", cardSet: "B", cards: { L: { go: "p15" } } },
-      p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "K", arrow: "E", next: "p16" },
+      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", light: "assets/fx/w2-sparkle12.webp?v=34", veil: "fast", transient: true, next: "p13" },
+      // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림.  왼쪽 카드를 누르면 → 14 (스크런치 포즈로 변신)
+      p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", cardSet: "B", cards: { L: { go: "p14" } } },
+      // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
+      p14: { route: "party", kind: "transform", frames: ["bl-15s"], from: "bl-13p", light: "assets/fx/w2-sparkle16.webp?v=34", veil: "fast", transient: true, next: "p15" },
+      p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
-      p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "L", arrow: "D", tapGo: "R", cardSet: "B", cards: { R: { go: "p18" } } },
-      // 18→19: 반짝임이 있는 18 에서 반짝임이 서서히 걷히며(reveal) 19 로, 그 뒤 자막
-      // 블썸 18: 파우치 포즈에 반짝임 소용돌이 (11번과 같은 효과, 자막 없이 끝나면 자동으로 19번 자막 화면)
-      p18: { route: "party", kind: "transform", frames: ["bl-18c"], char: "assets/fx/sparkle-char2.png", veil: "fast", transient: true, next: "p19" },
-      p19: { route: "party", kind: "dialogue", frames: ["bl-19"], text: "M", arrow: "E", next: "p20" },
-      p20: { route: "party", kind: "dialogue", frames: ["bl-20"], text: "N", arrow: "E", next: "h22" },
-      // 21(커튼) → 22: 커튼이 열리며 파티장
-      h22: { route: "hall", kind: "dialogue", frames: ["bl-22"], curtain: true, text: "O", arrow: "Z", next: "h23" },
-      h23: { route: "hall", kind: "dialogue", frames: ["bl-23"], text: "P", arrow: "Z", next: "h24" },
-      // 24: 지금까지 만든 마지막 화면 (다음 이미지가 오기 전까지는 안내 토스트)
+      p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", tapGo: "R", cardSet: "B", cards: { R: { go: "p18" } } },
+      // 18(=블썸 20 반짝임): 파우치 포즈로 변신, 끝나면 자동으로 19 자막
+      p18: { route: "party", kind: "transform", frames: ["bl-19s"], from: "bl-16p", light: "assets/fx/w2-sparkle20.webp?v=34", veil: "fast", transient: true, next: "p19" },
+      p19: { route: "party", kind: "dialogue", frames: ["bl-19"], text: "WM", arrow: "W", next: "p20" },
+      p20: { route: "party", kind: "dialogue", frames: ["bl-20"], text: "WN", arrow: "W", next: "h22" },
+      // 23(커튼) → 22: 커튼이 열리며 파티장
+      h22: { route: "hall", kind: "dialogue", frames: ["bl-22"], curtain: true, text: "WO", arrow: "WZ", next: "h23" },
+      h23: { route: "hall", kind: "dialogue", frames: ["bl-23"], text: "WP", arrow: "WZ", next: "h24" },
       // 24: ▶ → 흰 페이드로 편지 화면(letter.js)
-      h24: { route: "hall", kind: "dialogue", frames: ["bl-24"], text: "Q", arrow: "Z", next: null, toLetter: true },
+      h24: { route: "hall", kind: "dialogue", frames: ["bl-24"], text: "WQ", arrow: "WZ", next: null, toLetter: true },
     },
   },
 
@@ -286,4 +287,4 @@ window.GAME_DATA = {
 };
 
 // 블썸(와이드) 루트들은 너드 루트와 같은 버튼/카드 템플릿 → 같은 클릭 영역
-(function () { const R = window.GAME_DATA.story.routes; R.blossom.rects = R.partyA.rects = R.nerd.rects; })();
+(function () { const R = window.GAME_DATA.story.routes; R.blossom.rects = R.party.rects = R.hall.rects = R.nerd.rects; })();

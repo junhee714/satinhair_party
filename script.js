@@ -38,7 +38,7 @@
 
   // Routes whose pictures have a different layout (e.g. the wide nerd pictures) override some click-zone rects (data.js: routes.<name>.rects).
   let rectOverride = null, wideRoute = false;
-  const rectOf = (sceneEl, key) => (rectOverride && sceneEl && sceneEl.id === "scene-story" && rectOverride[key]) || RECTS[key];
+  const rectOf = (sceneEl, key) => (rectOverride && sceneEl && (sceneEl.id === "scene-story" || sceneEl.id === "scene-letter") && rectOverride[key]) || RECTS[key];
   const WIDE = (window.GAME_DATA && window.GAME_DATA.story && window.GAME_DATA.story.wide) || null;   // wide-canvas pictures (bleed on both sides)
 
   // --------------------------------------------------------------------------
@@ -100,6 +100,10 @@
 
   function drawSideFill(sceneEl, img, L) {
     if (img.tagName !== "IMG") return;
+    if (img.dataset.cover) {                           // plain picture that covers the whole screen (blossom letter): no side bars to fill
+      sceneEl.querySelectorAll(":scope > .scene-fill").forEach((c) => { c.style.display = "none"; });
+      return;
+    }
     applyEdgeColors(sceneEl, img);
     if (img.id === "introBg") {                        // the intro curtain covers the whole screen: no side bars to fill
       sceneEl.querySelectorAll(":scope > .scene-fill").forEach((c) => { c.style.display = "none"; });
@@ -682,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=31`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=34`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1315,7 +1319,7 @@
 
   // ==========================================================================
   // 블썸 11 (와이드 그림 버전): 디자이너가 만든 반짝임 그림을 그대로 씁니다.
-  //   assets/fx/w-sparkle12.webp = (반짝임 있는 그림 - 깨끗한 그림) 의 '빛 레이어'. 지나 뒤에서만 빛나고 지나 위(0)는 비어 있습니다.
+  //   assets/fx/w2-sparkle*.webp = (반짝임 있는 그림 - 깨끗한 그림) 의 '빛 레이어'. 지나 뒤에서만 빛나고 지나 위(0)는 비어 있습니다.
   //   깨끗한 그림 위에 빛이 서서히 차오르고(bloom), 밝은 띠가 아래→위로 한 번 훑고 지나가며, 마지막에 서서히 사라집니다 (data.js story.sparkle).
   // ==========================================================================
   const spLayer = document.getElementById("spLayer");
@@ -1331,14 +1335,14 @@
     window.cancelAnimationFrame(SP.raf);
     spLayer.classList.remove("on");
   }
-  function spRun(onEnd, baseKey, lightSrc) {
+  function spRun(onEnd, baseKey, lightSrc, fromKey) {
     spStop();
     const my = SP.token, C = ST.sparkle;
-    const base = imgByKey[baseKey], light = spLight(lightSrc);
+    const base = imgByKey[baseKey], light = spLight(lightSrc), from = fromKey ? imgByKey[fromKey] : null;
     const t0 = performance.now();
     const waitReady = () => {
       if (my !== SP.token) return;
-      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth;
+      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth && (!from || (from.complete && from.naturalWidth));
       if (!ok) {
         if (performance.now() - t0 > 3000) { if (onEnd) onEnd(); return; }       // assets missing: just move on
         SP.raf = window.requestAnimationFrame(waitReady);
@@ -1348,6 +1352,7 @@
       if (spCanvas.width !== W || spCanvas.height !== H) { spCanvas.width = W; spCanvas.height = H; }
       if (!SP.buf || SP.buf.width !== W || SP.buf.height !== H) { SP.buf = document.createElement("canvas"); SP.buf.width = W; SP.buf.height = H; }
       const bctx = SP.buf.getContext("2d");
+      if (from && (!SP.buf2 || SP.buf2.width !== W || SP.buf2.height !== H)) { SP.buf2 = document.createElement("canvas"); SP.buf2.width = W; SP.buf2.height = H; }
       spLayer.classList.add("on");
       layoutPhotoScene(sceneStory);
       const TOTAL = ST.transform.totalMs;
@@ -1356,7 +1361,23 @@
       const draw = (t) => {
         const ctx = spCtx;
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
-        ctx.drawImage(base, 0, 0, W, H);
+        const rq = from ? xfClamp((t - C.rampMs[0]) / (C.rampMs[1] - C.rampMs[0])) : 1;
+        if (from && rq < 1) {
+          // 변신: 이전 모습(from) 위로 지나가 아래→위로 서서히 짙어지며 나타남 (투명도 그라데이션이 발끝에서 머리 끝까지 올라감)
+          ctx.drawImage(from, 0, 0, W, H);
+          const yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * xfSmooth(rq)), hf = H * C.rampHalf;
+          const b2 = SP.buf2.getContext("2d");
+          b2.globalCompositeOperation = "source-over"; b2.globalAlpha = 1;
+          b2.clearRect(0, 0, W, H);
+          b2.drawImage(base, 0, 0, W, H);
+          const g2 = b2.createLinearGradient(0, yf - hf, 0, yf + hf);
+          g2.addColorStop(0, "rgba(0,0,0,0)"); g2.addColorStop(1, "rgba(0,0,0,1)");
+          b2.globalCompositeOperation = "destination-in";
+          b2.fillStyle = g2; b2.fillRect(0, 0, W, H);
+          ctx.drawImage(SP.buf2, 0, 0, W, H);
+        } else {
+          ctx.drawImage(base, 0, 0, W, H);
+        }
         const m = t - C.startDelayMs;
         if (m <= 0 || m >= C.fadeMs[1]) return;
         const bloom = xfSmooth(m / C.bloomMs);
@@ -1385,6 +1406,7 @@
         const t = now - tStart;
         draw(Math.min(t, TOTAL));
         if (t < TOTAL) { SP.raf = window.requestAnimationFrame(tick); return; }
+        if (from) storyShow(baseKey, { fade: false });          // the picture underneath becomes the final pose before the layer goes away
         spLayer.classList.remove("on");
         if (onEnd) onEnd();
       };
@@ -1418,7 +1440,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = `assets/scenes/${SUN_ROUTES.has(STEPS[id].route) ? "sn" : "bl"}-21.webp`;      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=34";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
@@ -1487,7 +1509,7 @@
     const frames = cfg.frames;
     // reveal: the picture first shows frames[0] (e.g. with sparkles), then slowly melts into reveal.to
     const RV = cfg.reveal || null;
-    if (!keep) storyShow(RV && settled ? RV.to : frames[0], { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
+    if (!keep) storyShow(RV && settled ? RV.to : (cfg.kind === "transform" && cfg.from && !settled ? cfg.from : frames[0]), { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
     let revealTextDelay = null;
     if (RV && !settled) {
       const base = instant ? 0 : ST.fadeMs;
@@ -1516,7 +1538,7 @@
       storyLater(() => glossRun(() => { glossDone = true; tryFinish(); }), instant ? 0 : TY.afterFadeMs);
     }
     if (live && cfg.kind === "transform") {
-      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.tint), fxDelayMs != null ? fxDelayMs : 0);
+      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.light ? cfg.from : cfg.tint), fxDelayMs != null ? fxDelayMs : 0);
     }
     if (cfg.text) {
       if (settled) typerShow(cfg.text, { instant: true, onDone: done });
@@ -1717,6 +1739,7 @@
   }
   const sceneLetter = document.getElementById("scene-letter");
   document.getElementById("letterBg").addEventListener("load", () => layoutPhotoScene(sceneLetter));
+  window.LetterScene.onTheme = () => layoutPhotoScene(sceneLetter);
   document.getElementById("letterBack").addEventListener("click", letterBack);
   document.getElementById("letterMute").addEventListener("click", toggleMute);
   document.getElementById("letterUndo").addEventListener("click", storyUndo);

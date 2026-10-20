@@ -14,12 +14,12 @@
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",
     letter: "letter.webp",
   };
-  const VER = "?v=30";
+  const VER = "?v=34";
   // 테마별 값: 봉투 사진마다 힌지(뚜껑 접히는 선)·모서리 위치와 크기가 달라서, 화면에서 보이는 크기/기울기가 같도록 K·ROT 를 맞춰 둠
   //  K = 레이어 이미지 배율, TL/TR = 힌지 양 끝, BR/BL = 아래쪽 모서리 (닫힌 봉투 사진 기준 px), shade = 열린 봉투 안쪽 색
   const THEMES = {
     blossom: {
-      dir: "assets/letter/", bg: "assets/scenes/letter-bg.webp", mute: "assets/scenes/mute-on-patch-pink.png",
+      dir: "assets/letter/", bg: "assets/scenes/letter-sat.webp", cover: true, mute: "assets/scenes/mute-on-patch-pink2.png",
       K: 0.82, OY: 400, TL: [86, 2], TR: [1065, 124], ROT: 5, BR: [974, 763], BL: [3, 636],
       shade: { y0: 334, y1: 616, top: "rgb(226,192,201)", bot: "rgb(237,208,215)" },
       shadowLetter: "rgba(100,36,64,0.34)", shadowPanels: "rgba(95,40,65,0.26)",
@@ -35,13 +35,14 @@
   const W = 804, H = 1748, S = 2;
 
   const bgImg = document.getElementById("letterBg");
+  const icons = document.getElementById("letterIcons");
   const mutePatch = document.getElementById("letterMutePatch");
   const cv = document.getElementById("letterCanvas");
   const ctx = cv.getContext("2d");
   const gift = document.getElementById("letterGift");
   const retry = document.getElementById("letterRetry");
   const layer = document.getElementById("letterLayer");
-  const api = { onGift: null, onRetry: null, playing: false };
+  const api = { onGift: null, onRetry: null, onTheme: null, playing: false };
 
   // ---- timeline (ms)
   const FLY0 = 150, FLY = 800;               // envelope flight left -> right
@@ -94,7 +95,11 @@
     if (!THEMES[name]) name = "blossom";
     themeName = name; T = THEMES[name]; applyGeometry(); img = imgs[name] || {};
     const bgSrc = T.bg + VER;
+    // blossom: plain satin picture that covers the whole screen (never cropped, whatever the screen shape) + the three round icons as a separate layer on the 402x874 frame
+    if (T.cover) bgImg.dataset.cover = "1"; else delete bgImg.dataset.cover;
+    if (icons) icons.style.display = T.cover ? "" : "none";
     if (!bgImg.src.endsWith(bgSrc)) bgImg.src = bgSrc;
+    if (api.onTheme) api.onTheme();
     if (!mutePatch.src.endsWith(T.mute)) mutePatch.src = T.mute;
     const gi = gift.querySelector("img"), ri = retry.querySelector("img");
     if (!gi.src.endsWith(T.dir + "btn-gift.webp" + VER)) { gi.src = T.dir + "btn-gift.webp" + VER; ri.src = T.dir + "btn-retry.webp" + VER; }
