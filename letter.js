@@ -14,18 +14,18 @@
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",
     letter: "letter.webp",
   };
-  const VER = "?v=48";
+  const VER = "?v=51";
   // 테마별 값: 봉투 사진마다 힌지(뚜껑 접히는 선)·모서리 위치와 크기가 달라서, 화면에서 보이는 크기/기울기가 같도록 K·ROT 를 맞춰 둠
   //  K = 레이어 이미지 배율, TL/TR = 힌지 양 끝, BR/BL = 아래쪽 모서리 (닫힌 봉투 사진 기준 px), shade = 열린 봉투 안쪽 색
   const THEMES = {
     blossom: {
-      dir: "assets/letter/", bg: "assets/scenes/letter-sat.webp", cover: true, mute: "assets/scenes/mute-on-patch-pink2.png", icons: "assets/scenes/letter-icons2.webp",
+      dir: "assets/letter/", bg: "assets/scenes/letter-sat.webp", cover: true, mute: "assets/scenes/mute-on-patch-pink2.png", icons: "assets/scenes/letter-icons2.webp", orn: "assets/scenes/letter-orn-pink.webp",
       K: 0.82, OY: 400, TL: [86, 2], TR: [1065, 124], ROT: 5, BR: [974, 763], BL: [3, 636],
       shade: { y0: 334, y1: 616, top: "rgb(226,192,201)", bot: "rgb(237,208,215)" },
       shadowLetter: "rgba(100,36,64,0.34)", shadowPanels: "rgba(95,40,65,0.26)",
     },
     sunset: {
-      dir: "assets/letter/sun/", bg: "assets/scenes/letter-sat-sun.webp", cover: true, mute: "assets/scenes/mute-on-patch-gold2.png", icons: "assets/scenes/letter-icons-gold.webp",
+      dir: "assets/letter/sun/", bg: "assets/scenes/letter-sat-sun.webp", cover: true, mute: "assets/scenes/mute-on-patch-gold2.png", icons: "assets/scenes/letter-icons-gold.webp", orn: "assets/scenes/letter-orn-gold.webp",
       K: 0.8172, OY: 400, TL: [88, 2], TR: [1072, 110], ROT: 5.84, BR: [990, 752], BL: [2, 628],
       shade: { y0: 324, y1: 602, top: "rgb(231,205,155)", bot: "rgb(243,220,165)" },
       shadowLetter: "rgba(104,74,26,0.34)", shadowPanels: "rgba(100,70,24,0.26)",
@@ -38,7 +38,7 @@
   const CW = W + 2 * PADX * S, CH = H + 2 * PADY * S;
 
   const bgImg = document.getElementById("letterBg");
-  const icons = document.getElementById("letterIcons");
+  const icons = document.getElementById("letterIcons"), orn = document.getElementById("letterOrn");
   const mutePatch = document.getElementById("letterMutePatch");
   const cv = document.getElementById("letterCanvas");
   cv.width = CW; cv.height = CH;
@@ -85,7 +85,7 @@
     name = name || themeName;
     if (loadedBy[name]) return loadedBy[name];
     const th = THEMES[name], set = (imgs[name] = {});
-    const bg = new Image(); bg.src = th.bg + VER;                           // warm the cache for the background too
+    const bg = new Image(); bg.src = th.bg + VER; if (th.orn) { const o = new Image(); o.src = th.orn + VER; }                           // warm the cache for the background too
     loadedBy[name] = Promise.all(Object.keys(FILES).map((k) => new Promise((res) => {
       const i = new Image();
       i.onload = () => { set[k] = i; res(); };
@@ -103,6 +103,7 @@
     if (T.cover) bgImg.dataset.cover = "1"; else delete bgImg.dataset.cover;
     if (icons) { icons.style.display = T.cover ? "" : "none"; if (T.icons) { const is = T.icons + VER; if (!icons.src.endsWith(is)) icons.src = is; } }
     if (!bgImg.src.endsWith(bgSrc)) bgImg.src = bgSrc;
+    if (orn && T.orn) { const os = T.orn + VER; if (!orn.src.endsWith(os)) orn.src = os; }
     if (api.onTheme) api.onTheme();
     if (!mutePatch.src.endsWith(T.mute)) mutePatch.src = T.mute;
     const gi = gift.querySelector("img"), ri = retry.querySelector("img");
