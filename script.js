@@ -724,13 +724,13 @@
   Object.values(MAP.arrows).forEach((a) => layerImg(a.png));
 
   // fx sprites live in one layer that exactly covers the picture, so they use % of the picture
-  function fxSprite(src, rect, cls) {
+  function fxSprite(src, rect, cls, parent) {
     const el = document.createElement("img");
     el.className = `fx-sprite ${cls}`;
     el.src = src; el.alt = ""; el.draggable = false;
     el.style.left = `${rect.x * 100}%`; el.style.top = `${rect.y * 100}%`;
     el.style.width = `${rect.w * 100}%`; el.style.height = `${rect.h * 100}%`;
-    storyFx.appendChild(el);
+    (parent || storyFx).appendChild(el);
     return el;
   }
   const patchSets = { A: {}, B: {}, S: {}, S2: {} };
@@ -1058,7 +1058,7 @@
   // 블썸 17: 카드 사진이 앞에서 날아와 지나 '뒤'로 붙는다. (카드 → 지나 누끼 순서로 두 장을 얹고, 지나 쪽이 모션 끝에서 카드 앞으로 올라옴)
   story.pcard = [];
   function stopPouchCard(soft) {
-    const els = Array.from(storyFx.querySelectorAll(".pcard"));
+    const els = Array.from(storyFx.querySelectorAll(".pcard-wrap"));
     const anims = story.pcard; story.pcard = [];
     if (soft && els.length) {
       els.forEach((el) => el.classList.add("leaving"));
@@ -1072,8 +1072,13 @@
     stopPouchCard();
     const P = ST.pouchCard;
     if (!P) return;
-    const card = fxSprite(P.src, P.rect, "pcard pcard-card");
-    const girl = fxSprite(P.char, P.charRect, "pcard pcard-girl");
+    // the whole thing lives in a box that is cut off above the speech box (clipTop = its top edge, 0~1 of the picture height), so the card and the girl's legs never come in front of the caption box
+    const wrap = document.createElement("div");
+    wrap.className = "pcard-wrap";
+    wrap.style.clipPath = `inset(-100% -100% ${((1 - P.clipTop) * 100).toFixed(2)}% -100%)`;
+    storyFx.appendChild(wrap);
+    const card = fxSprite(P.src, P.rect, "pcard pcard-card", wrap);
+    const girl = fxSprite(P.char, P.charRect, "pcard pcard-girl", wrap);
     if (settled) return;                                        // 되돌아왔을 때: 이미 붙어 있는 모습 그대로
     const cx = P.rect.x + P.rect.w / 2, cy = P.rect.y + P.rect.h / 2;
     const dx = ((P.startX - cx) / P.rect.w) * 100, dy = ((P.startY - cy) / P.rect.h) * 100;     // % of the card's own size
@@ -1681,7 +1686,8 @@
     if (cfg.text) {
       if (settled) typerShow(cfg.text, { instant: true, onDone: done });
       else {
-        const td = textDelayMs != null ? textDelayMs : revealTextDelay != null ? revealTextDelay : instant ? 0 : TY.afterFadeMs;
+        const pcHold = cfg.fx === "pouchcard" && ST.pouchCard ? (ST.pouchCard.delayMs || 0) + (ST.pouchCard.textAfterMs || 0) : 0;      // 반짝임 → 카드 → 자막: 카드가 자리를 잡을 때쯤 자막 시작
+        const td = (textDelayMs != null ? textDelayMs : revealTextDelay != null ? revealTextDelay : instant ? 0 : TY.afterFadeMs) + pcHold;
         storyLater(() => typerShow(cfg.text, { onDone: done }), td);
       }
     } else {

@@ -142,11 +142,11 @@ window.GAME_DATA = {
     sparkleStyle: "classic",
     //  pouchCard: 블썸 17(스크런치 자막) — 자막이 올라올 때 카드 사진이 "앞에서 날아와 지나 뒤로 붙는" 모션.
     //   rect = 카드 최종 위치(402x874 기준 비율), char = 지나 누끼(카드가 지나 '뒤'에 오도록 위에 한 장 더 덮음, charRect = 와이드 그림 전체)
-    //   delayMs 자막 시작 기준 대기 / durMs 전체 시간 / startScale·startX·startY 처음 크기(앞)·중심 위치(화면 비율) / startRot 처음 기울기(도)
+    //   delayMs 반짝임이 끝난 뒤 카드가 날아오기까지 / textAfterMs 카드가 날아오기 시작한 뒤 자막 시작까지 (순서: 반짝임 → 카드 → 자막) / clipTop 자막 상자 윗선(그림 높이 0~1) — 카드·지나 다리가 이 선 아래(자막 상자)로 내려오지 않게 자름 / durMs 전체 시간 / startScale·startX·startY 처음 크기(앞)·중심 위치(화면 비율) / startRot 처음 기울기(도)
     //   sinkAt 뒤로 쑥 들어가는 시점(0~1)·sinkScale 그때 크기 / frontOffAt~frontOnAt 지나가 카드 앞으로 올라오는 구간(0~1)
     pouchCard: { src: "assets/fx/bl-pouchcard.webp?v=52", rect: { x: -0.0662, y: 0.12655, w: 0.5527, h: 0.3162 },
                  char: "assets/fx/w4-char14b.webp?v=50", charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
-                 delayMs: 80, durMs: 1000, startScale: 1.7, startX: 0.52, startY: 0.56, startRot: 10,
+                 delayMs: 60, durMs: 1000, textAfterMs: 760, clipTop: 0.565, startScale: 1.7, startX: 0.52, startY: 0.56, startRot: 10,
                  sinkAt: 0.68, sinkScale: 0.94, frontOffAt: 0.5, frontOnAt: 0.74, sfx: "stick" },
     //  routeStart: 너드 지나 5 의 카드(go:"@...")를 누르면 처음 들어가는 화면
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },
