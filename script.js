@@ -686,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=41`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=42`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1367,7 +1367,7 @@
     spStop();
     const my = SP.token, C = ST.sparkle;
     const baseKey = cfg.frames[0], base = imgByKey[baseKey], charImg = spLight(cfg.char);
-    const from = cfg.from ? imgByKey[cfg.from] : null;
+    const from = cfg.from ? imgByKey[cfg.from] : null, plate = imgByKey[C.plate];
     const endKey = cfg.next && STEPS[cfg.next] ? STEPS[cfg.next].frames[0] : null, endImg = endKey ? imgByKey[endKey] : null;
     const t0 = performance.now();
     const waitReady = () => {
@@ -1405,7 +1405,7 @@
         hmc.fillStyle = r; hmc.fillRect(0, 0, W, H);
       });
       hg.globalCompositeOperation = "destination-in"; hg.drawImage(hm, 0, 0);
-      const bandBuf = cv(), bb = bandBuf.getContext("2d");
+      const bandBuf = cv(), bb = bandBuf.getContext("2d"), lightBuf = cv(), lb = lightBuf.getContext("2d");
       const rampBuf = from ? cv() : null, rb = rampBuf ? rampBuf.getContext("2d") : null;
       spLayer.classList.add("on");
       layoutPhotoScene(sceneStory);
@@ -1418,11 +1418,23 @@
         const rq = from ? xfClamp((t - C.rampMs[0]) / (C.rampMs[1] - C.rampMs[0])) : 1;
         ctx.drawImage(from && rq < 1 ? from : base, 0, 0, W, H);                   // the room (the girl is part of it, but she is drawn again on top below)
         const bloom = 1 - Math.pow(1 - xfClamp(t / C.bloomMs), 2);                  // comes up fast right from the first frame
-        const fade = 1 - xfSmooth((t - C.fadeMs[0]) / (C.fadeMs[1] - C.fadeMs[0]));
-        if (fade > 0) {
+        // the light is wiped away from the bottom up to the very top edge of the screen (instead of just dimming)
+        const wp = xfSmooth((t - C.wipeMs[0]) / (C.wipeMs[1] - C.wipeMs[0]));
+        const yE = H * (1 - wp) * (1 + C.wipeSoft), soft = H * C.wipeSoft;
+        const wipe = (g) => {
+          if (wp <= 0) return;
+          const gr = g.createLinearGradient(0, yE - soft, 0, yE);
+          gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+          g.globalCompositeOperation = "destination-in"; g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        };
+        if (wp < 1) {
           // 1) the spiral of light, BEHIND the girl
-          ctx.globalAlpha = C.strength * bloom * fade;
-          ctx.drawImage(spT, 0, 0);
+          lb.globalCompositeOperation = "source-over"; lb.globalAlpha = 1;
+          lb.clearRect(0, 0, W, H);
+          lb.drawImage(spT, 0, 0);
+          wipe(lb);
+          ctx.globalAlpha = C.strength * bloom;
+          ctx.drawImage(lightBuf, 0, 0);
           // 2) one brighter stream that runs up the spiral (bottom -> top), also behind her
           const q = xfClamp((t - C.bandMs[0]) / (C.bandMs[1] - C.bandMs[0]));
           if (q > 0 && q < 1) {
@@ -1433,8 +1445,9 @@
             const gr = bb.createLinearGradient(0, yc - half, 0, yc + half);
             gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
             bb.globalCompositeOperation = "destination-in"; bb.fillStyle = gr; bb.fillRect(0, 0, W, H);
+            wipe(bb);
             ctx.globalCompositeOperation = "lighter";
-            ctx.globalAlpha = C.bandGain * bloom * fade * Math.sin(Math.PI * q);
+            ctx.globalAlpha = C.bandGain * bloom * Math.sin(Math.PI * q);
             ctx.drawImage(bandBuf, 0, 0);
           }
         }
@@ -1454,17 +1467,19 @@
           ctx.drawImage(charImg, 0, 0, W, H);
         }
         ctx.drawImage(hud, 0, 0);
-        // 4) the picture melts into the next screen's picture (text box + tray) behind the white fade, so nothing pops or blinks afterwards
-        if (endImg && endImg.complete && endImg.naturalWidth && t > C.whiteMs[0]) {
-          ctx.globalAlpha = xfSmooth((t - C.whiteMs[0]) / (C.whiteMs[1] - C.whiteMs[0]));
+        // 4) the next screen's text box appears: first the legs behind the box's area give way to the empty room (so the half-transparent box never shows legs through it), then the picture of the next screen melts in
+        if (endImg && endImg.complete && endImg.naturalWidth && t > C.legsMs[0]) {
+          ctx.globalCompositeOperation = "source-over";
+          if (plate && plate.complete && plate.naturalWidth) {
+            ctx.save();
+            ctx.beginPath(); ctx.rect(0, H * C.boxRows[0], W, H * (C.boxRows[1] - C.boxRows[0])); ctx.clip();
+            ctx.globalAlpha = xfSmooth((t - C.legsMs[0]) / (C.legsMs[1] - C.legsMs[0]));
+            ctx.drawImage(plate, 0, 0, W, H);
+            ctx.restore();
+          }
+          ctx.globalAlpha = xfSmooth((t - C.endMs[0]) / (C.endMs[1] - C.endMs[0]));
           ctx.drawImage(endImg, 0, 0, W, H);
           ctx.globalAlpha = 1;
-        }
-        // 5) the whole frame breathes through white for ~0.5 s while the light melts away
-        const wu = xfClamp((t - C.whiteMs[0]) / (C.whiteMs[1] - C.whiteMs[0]));
-        if (wu > 0 && wu < 1) {
-          ctx.globalAlpha = C.whitePeak * Math.sin(Math.PI * wu);
-          ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
         }
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
       };
@@ -1508,7 +1523,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=41";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=42";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
