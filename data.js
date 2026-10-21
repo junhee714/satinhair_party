@@ -67,7 +67,7 @@ window.GAME_DATA = {
     shine: { src: "assets/audio/sfx/shine.mp3?v=30", volume: 0.8 },
     wind:  { src: "assets/audio/sfx/wind.mp3?v=30",  volume: 1.0, delayMs: 100 },   // delayMs: 편지 화면의 흰 페이드가 걷히며 날아오는 모습이 보이는 시점에 맞춤
     glow:  { src: "assets/audio/sfx/glow.mp3?v=30",  volume: 0.8 },
-    stick: { src: "assets/audio/sfx/stick.mp3?v=52", volume: 0.7 },                // 블썸 17: 카드가 앞에서 날아와 뒤로 붙을 때 (쉬잉 + 톡)                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
+    stick: { src: "assets/audio/sfx/stick2.mp3?v=57", volume: 1.0 },                // 블썸 17: 카드가 앞에서 날아와 뒤로 붙을 때 (쉬잉 + 톡)                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
   },
   crossFadeMs: 1800,          // "초대장 받기" → 너드 지나: 첫 곡이 사라지는 시간 (두 번째 곡 페이드인과 겹침)
   },
@@ -154,11 +154,11 @@ window.GAME_DATA = {
       // 선셋 17 (스크런치 자막) / 선셋 21 (파우치 자막)
       sp15: { src: "assets/fx/sw-pouchcard17.webp?v=55", rect: { x: -0.14677, y: 0.14332, w: 0.70974, h: 0.33551 },
               char: "assets/fx/sw-char14.webp?v=46", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
-      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.4063, y: 0.2563, w: 0.5687, h: 0.29345 },
+      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.47, y: 0.2663, w: 0.53, h: 0.2735 },
               char: "assets/fx/sw-char18b.webp?v=55", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
     },
     pouchCard: { charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
-                 delayMs: 60, durMs: 1500, textAfterMs: 1750, textFadeMs: 170, startScale: 1.7,
+                 delayMs: 60, durMs: 1500, textAfterMs: 1350, textFadeMs: 130, textGlyphMs: 25, startScale: 1.7,
                  sinkAt: 0.66, sinkScale: 0.94, frontOffAt: 0.5, frontOnAt: 0.74, sfx: "stick" },
     //  routeStart: 너드 지나 5 의 카드(go:"@...")를 누르면 처음 들어가는 화면
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },

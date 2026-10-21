@@ -852,7 +852,7 @@
       line.glyphs.forEach((g, gi) => {
         ev.push({ t, li, gi });
         const punct = /[.,!?~]/.test(chars[gi] || "");
-        t += TY.glyphMs * (punct ? 1.9 : 1) + (g.space ? TY.spaceMs : 0);
+        t += (typer.glyph || TY.glyphMs) * (punct ? 1.9 : 1) + (g.space ? TY.spaceMs : 0);
       });
       t += TY.lineGapMs;
     });
@@ -892,7 +892,7 @@
   }
 
   // Put text group `gid` on screen. instant = no typing (already read / coming back).
-  function typerShow(gid, { instant = false, onDone = null, fadeInMs = 0 } = {}) {
+  function typerShow(gid, { instant = false, onDone = null, fadeInMs = 0, glyphMs = 0 } = {}) {
     const map = MAP.text[gid];
     typerCancel();
     if (!map) { typer.done = true; if (onDone) onDone(); return; }
@@ -900,6 +900,7 @@
     if (story.textGid === gid && typer.gid === gid && typer.done) { if (onDone) onDone(); return; }
     typer.gid = gid;
     typer.fade = fadeInMs || 0;
+    typer.glyph = glyphMs || 0;
     story.textGid = gid;
     typeCanvas.width = map.w;
     typeCanvas.height = map.h;
@@ -1069,19 +1070,40 @@
       els.forEach((el) => el.remove());
     }
   }
-  function startPouchCard({ settled = false, key = null } = {}) {
+  // 카드·그림자·지나 누끼를 미리 만들어(투명) 그림을 해독해 둔다 → 날아오는 순간에 처음 그리느라 뚝 끊기지 않게
+  //   전체를 자막 상자 윗선(clipTop)에서 자르는 상자 하나(overflow:hidden — clip-path 보다 가볍다)에 담는다. 좌우는 PC 의 넓은 화면을 위해 SIDE 만큼 여유를 둔다.
+  const PC_SIDE = 0.25;
+  function buildPouchCard(key, settled) {
     stopPouchCard();
     const P = ST.pouchCard && ST.pouchCards && ST.pouchCards[key] ? { ...ST.pouchCard, ...ST.pouchCards[key] } : null;
-    if (!P) return;
-    // the whole thing lives in a box that is cut off above the speech box (clipTop = its top edge, 0~1 of the picture height), so the card and the girl's legs never come in front of the caption box
+    if (!P) return null;
     const wrap = document.createElement("div");
     wrap.className = "pcard-wrap";
-    wrap.style.clipPath = `inset(-100% -100% ${((1 - P.clipTop) * 100).toFixed(2)}% -100%)`;
+    wrap.style.left = `${-PC_SIDE * 100}%`; wrap.style.width = `${(1 + 2 * PC_SIDE) * 100}%`;
+    wrap.style.top = "0"; wrap.style.height = `${P.clipTop * 100}%`;
     storyFx.appendChild(wrap);
-    const shadow = settled ? null : fxSprite(P.src, P.rect, "pcard pcard-shadow", wrap);
-    const card = fxSprite(P.src, P.rect, "pcard pcard-card", wrap);
-    const girl = fxSprite(P.char, P.charRect, "pcard pcard-girl", wrap);
+    const place = (el, r) => {
+      el.style.left = `${((r.x + PC_SIDE) / (1 + 2 * PC_SIDE)) * 100}%`; el.style.top = `${(r.y / P.clipTop) * 100}%`;
+      el.style.width = `${(r.w / (1 + 2 * PC_SIDE)) * 100}%`; el.style.height = `${(r.h / P.clipTop) * 100}%`;
+    };
+    const img = (src, r, cls) => { const el = document.createElement("img"); el.className = `fx-sprite pcard ${cls}`; el.src = src; el.alt = ""; el.draggable = false; place(el, r); wrap.appendChild(el); return el; };
+    // 그림자: 카드 아래에 깔리는 부드러운 어두운 얼룩 (filter 없이 그라데이션 — transform/opacity 만 움직인다)
+    let shadow = null;
+    if (!settled) { shadow = document.createElement("div"); shadow.className = "pcard pcard-shadow"; place(shadow, P.rect); shadow.style.opacity = "0"; wrap.appendChild(shadow); }
+    const card = img(P.src, P.rect, "pcard-card");
+    const girl = img(P.char, P.charRect, "pcard-girl");
+    if (!settled) { card.style.opacity = "0"; girl.style.opacity = "0"; }
+    const ready = settled ? Promise.resolve() : Promise.all([card, girl].map((el) => (el.decode ? el.decode().catch(() => {}) : Promise.resolve())));
+    return { key, P, wrap, card, shadow, girl, ready };
+  }
+  function startPouchCard({ settled = false, key = null } = {}) {
+    let o = story.pcPrep && story.pcPrep.key === key && story.pcPrep.wrap.isConnected ? story.pcPrep : null;
+    story.pcPrep = null;
+    if (!o) o = buildPouchCard(key, settled);
+    if (!o) return;
     if (settled) return;                                        // 되돌아왔을 때: 이미 붙어 있는 모습 그대로
+    const { P, card, shadow, girl } = o;
+    const run = () => {
     const cx = P.rect.x + P.rect.w / 2, cy = P.rect.y + P.rect.h / 2;
     const dx = ((P.startX - cx) / P.rect.w) * 100, dy = ((P.startY - cy) / P.rect.h) * 100;     // % of the card's own size
     const sk = P.sinkAt, Z = P.sinkScale;
@@ -1106,7 +1128,9 @@
       { opacity: 0, offset: 0 }, { opacity: 0, offset: P.frontOffAt }, { opacity: 1, offset: P.frontOnAt }, { opacity: 1, offset: 1 },
     ], { duration: P.durMs, fill: "both" });
     story.pcard.push(a1, a2); if (a3) story.pcard.push(a3);
-    if (P.sfx) Sfx.play(P.sfx);
+    if (P.sfx) Sfx.play(P.sfx, P.sfxDelayMs || 0);
+    };
+    o.ready.then(() => { if (o.wrap.isConnected) run(); });
   }
 
   // "pressed" look of a card as a patch over the picture (hover / press / locked-in)
@@ -1698,7 +1722,7 @@
       else {
         const pcHold = cfg.fx === "pouchcard" && ST.pouchCard ? (ST.pouchCard.delayMs || 0) + (ST.pouchCard.textAfterMs || 0) : 0;      // 반짝임 → 카드 → 자막: 카드가 자리를 잡을 때쯤 자막 시작
         const td = (textDelayMs != null ? textDelayMs : revealTextDelay != null ? revealTextDelay : instant ? 0 : TY.afterFadeMs) + pcHold;
-        storyLater(() => typerShow(cfg.text, { onDone: done, fadeInMs: cfg.fx === "pouchcard" && ST.pouchCard ? ST.pouchCard.textFadeMs || 0 : 0 }), td);
+        storyLater(() => typerShow(cfg.text, { onDone: done, fadeInMs: cfg.fx === "pouchcard" && ST.pouchCard ? ST.pouchCard.textFadeMs || 0 : 0, glyphMs: cfg.fx === "pouchcard" && ST.pouchCard ? ST.pouchCard.textGlyphMs || 0 : 0 }), td);
       }
     } else {
       done();
@@ -1709,6 +1733,7 @@
     if (cfg.fx === "marks" && !keep) storyLater(() => startMarks({ pop: !settled }), settled ? 0 : ST.marks.startDelayMs);
     if (cfg.fx === "pouchcard") {
       const pcDelay = settled ? 0 : (textDelayMs != null ? textDelayMs : instant ? 0 : TY.afterFadeMs) + ((ST.pouchCard && ST.pouchCard.delayMs) || 0);
+      if (!settled) story.pcPrep = buildPouchCard(cfg.pouch, false);          // 미리 만들어 그림을 해독해 둔다
       storyLater(() => startPouchCard({ settled, key: cfg.pouch }), pcDelay);
     }
     if (cfg.kind === "result") storyLater(() => showToast(ST.endToast, 2600, "top"), 1100);
