@@ -867,7 +867,7 @@
     for (const e of typer.events) {
       if (e.t > now) break;
       const line = map.lines[e.li], g = line.glyphs[e.gi];
-      const a = Math.min(1, (now - e.t) / TY.fadeInMs);
+      const a = Math.min(1, (now - e.t) / (typer.fade || TY.fadeInMs));
       const w = g.x1 - g.x0, h = line.y1 - line.y0;
       typeCtx.globalAlpha = a;
       typeCtx.drawImage(img, g.x0, line.y0, w, h, g.x0, line.y0, w, h);
@@ -892,13 +892,14 @@
   }
 
   // Put text group `gid` on screen. instant = no typing (already read / coming back).
-  function typerShow(gid, { instant = false, onDone = null } = {}) {
+  function typerShow(gid, { instant = false, onDone = null, fadeInMs = 0 } = {}) {
     const map = MAP.text[gid];
     typerCancel();
     if (!map) { typer.done = true; if (onDone) onDone(); return; }
     // same text still on screen → keep it (no retyping)
     if (story.textGid === gid && typer.gid === gid && typer.done) { if (onDone) onDone(); return; }
     typer.gid = gid;
+    typer.fade = fadeInMs || 0;
     story.textGid = gid;
     typeCanvas.width = map.w;
     typeCanvas.height = map.h;
@@ -916,7 +917,7 @@
     const tick = () => {
       const now = performance.now() - typer.start;
       typerDraw(Math.max(0, now));
-      if (now >= typer.total + TY.fadeInMs) { typerFinish(); return; }
+      if (now >= typer.total + (typer.fade || TY.fadeInMs)) { typerFinish(); return; }
       typer.raf = window.requestAnimationFrame(tick);
     };
     typer.raf = window.requestAnimationFrame(tick);
@@ -1077,6 +1078,7 @@
     wrap.className = "pcard-wrap";
     wrap.style.clipPath = `inset(-100% -100% ${((1 - P.clipTop) * 100).toFixed(2)}% -100%)`;
     storyFx.appendChild(wrap);
+    const shadow = settled ? null : fxSprite(P.src, P.rect, "pcard pcard-shadow", wrap);
     const card = fxSprite(P.src, P.rect, "pcard pcard-card", wrap);
     const girl = fxSprite(P.char, P.charRect, "pcard pcard-girl", wrap);
     if (settled) return;                                        // 되돌아왔을 때: 이미 붙어 있는 모습 그대로
@@ -1084,18 +1086,26 @@
     const dx = ((P.startX - cx) / P.rect.w) * 100, dy = ((P.startY - cy) / P.rect.h) * 100;     // % of the card's own size
     const sk = P.sinkAt, Z = P.sinkScale;
     const ease = "cubic-bezier(.22,.75,.3,1)";
-    const shF = "drop-shadow(0 26px 30px rgba(120,50,80,.38))", shB = "drop-shadow(0 2px 4px rgba(120,50,80,.16))", sh0 = "drop-shadow(0 0 0 rgba(120,50,80,0))";
-    const a1 = card.animate([
-      { transform: `translate(${dx}%,${dy}%) scale(${P.startScale}) rotate(${P.startRot}deg)`, opacity: 0, filter: shF, offset: 0, easing: "ease-out" },
-      { transform: `translate(${dx * 0.93}%,${dy * 0.93}%) scale(${P.startScale * 1.03}) rotate(${P.startRot * 0.9}deg)`, opacity: 1, filter: shF, offset: 0.1, easing: ease },
-      { transform: `translate(-1.5%,-1%) scale(${Z}) rotate(-3deg)`, opacity: 1, filter: shB, offset: sk, easing: "ease-in-out" },
-      { transform: "translate(0.4%,0.3%) scale(1.035) rotate(0.8deg)", opacity: 1, filter: shB, offset: sk + (1 - sk) * 0.5, easing: "ease-out" },
-      { transform: "translate(0,0) scale(1) rotate(0deg)", opacity: 1, filter: sh0, offset: 1 },
-    ], { duration: P.durMs, fill: "both" });
+    // 그림자는 카드 아래에 깔아 둔 어두운 복사본(고정 블러) — 모션 중에 filter 값을 바꾸지 않고 transform/opacity 만 움직여서 휴대폰에서도 끊기지 않게
+    const T = (x, y, sc, r) => `translate(${x}%,${y}%) scale(${sc}) rotate(${r}deg)`;
+    const k = [
+      { x: dx, y: dy, sc: P.startScale, r: P.startRot, o: 0, so: 0, off: 0 },
+      { x: dx * 0.93, y: dy * 0.93, sc: P.startScale * 1.03, r: P.startRot * 0.9, o: 1, so: 0.34, off: 0.1 },
+      { x: -1.5, y: -1, sc: Z, r: -3, o: 1, so: 0.1, off: sk },
+      { x: 0.4, y: 0.3, sc: 1.035, r: 0.8, o: 1, so: 0.05, off: sk + (1 - sk) * 0.5 },
+      { x: 0, y: 0, sc: 1, r: 0, o: 1, so: 0, off: 1 },
+    ];
+    const frames = (shadowPass) => k.map((f, i) => ({
+      transform: shadowPass ? T(f.x + 1, f.y + 2 + f.so * 30, f.sc, f.r) : T(f.x, f.y, f.sc, f.r),
+      opacity: shadowPass ? f.so * f.o : f.o,
+      offset: f.off, easing: i === 0 ? "ease-out" : i === 1 ? ease : i === 2 ? "ease-in-out" : "ease-out",
+    }));
+    const a1 = card.animate(frames(false), { duration: P.durMs, fill: "both" });
+    const a3 = shadow ? shadow.animate(frames(true), { duration: P.durMs, fill: "both" }) : null;
     const a2 = girl.animate([
       { opacity: 0, offset: 0 }, { opacity: 0, offset: P.frontOffAt }, { opacity: 1, offset: P.frontOnAt }, { opacity: 1, offset: 1 },
     ], { duration: P.durMs, fill: "both" });
-    story.pcard.push(a1, a2);
+    story.pcard.push(a1, a2); if (a3) story.pcard.push(a3);
     if (P.sfx) Sfx.play(P.sfx);
   }
 
@@ -1688,7 +1698,7 @@
       else {
         const pcHold = cfg.fx === "pouchcard" && ST.pouchCard ? (ST.pouchCard.delayMs || 0) + (ST.pouchCard.textAfterMs || 0) : 0;      // 반짝임 → 카드 → 자막: 카드가 자리를 잡을 때쯤 자막 시작
         const td = (textDelayMs != null ? textDelayMs : revealTextDelay != null ? revealTextDelay : instant ? 0 : TY.afterFadeMs) + pcHold;
-        storyLater(() => typerShow(cfg.text, { onDone: done }), td);
+        storyLater(() => typerShow(cfg.text, { onDone: done, fadeInMs: cfg.fx === "pouchcard" && ST.pouchCard ? ST.pouchCard.textFadeMs || 0 : 0 }), td);
       }
     } else {
       done();
