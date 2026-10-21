@@ -673,7 +673,7 @@
   const FX = window.FX_MAP || { petals: [], marks: {}, cards: {} };
   const FX_SUN = window.FX_MAP_SUN || { petals: [], marks: {}, cards: {} };
   // petals / marks / card patches / hair mask are cut from the pictures of each route
-  const SUN_ROUTES = new Set(["sunset", "sparty", "shall"]);
+  const SUN_ROUTES = new Set(["sunset", "sparty", "sparty0", "shall"]);
   const fxFor = (route) => (SUN_ROUTES.has(route) ? FX_SUN : FX);
 
   sceneStory.style.setProperty("--story-fade", `${ST.fadeMs}ms`);
@@ -708,7 +708,7 @@
   warmed.nerd = true;
   // After the page has settled, fetch both routes' pictures in the background (instead of waiting for the choice screen),
   // so no screen has to be downloaded while the player is tapping through.
-  function warmAllRoutes() { ["blossom", "sunset"].forEach((r, i) => window.setTimeout(() => warmRoute(r), i * 1500)); }
+  function warmAllRoutes() { ["blossom", "sunset", "sparty0"].forEach((r, i) => window.setTimeout(() => warmRoute(r), i * 1500)); }
   (function () {
     const go = () => window.setTimeout(warmAllRoutes, 2500);
     if (document.readyState === "complete") go(); else window.addEventListener("load", go, { once: true });
@@ -1351,15 +1351,17 @@
     spLayer.classList.remove("on");
   }
   // the spiral of light (assets/fx/sparkle-light.webp, tinted once) – shared by all blossom sparkle screens
-  function spTinted() {
-    if (SP.tinted) return SP.tinted;
+  function spTinted(tint) {
+    tint = tint || "rose";
+    SP.tintedBy = SP.tintedBy || {};
+    if (SP.tintedBy[tint]) return SP.tintedBy[tint];
     const L = XF.light, c = document.createElement("canvas");
     c.width = L.naturalWidth; c.height = L.naturalHeight;
     const g = c.getContext("2d");
     g.drawImage(L, 0, 0);
     g.globalCompositeOperation = "source-atop";             // faint rose tint so the white light blends with the pink room
-    g.fillStyle = XF_TINTS.rose; g.fillRect(0, 0, c.width, c.height);
-    SP.tinted = c;
+    g.fillStyle = XF_TINTS[tint] || XF_TINTS.rose; g.fillRect(0, 0, c.width, c.height);
+    SP.tintedBy[tint] = c;
     return c;
   }
   // cfg = the step (frames[0] = picture that is shown, char = cut-out of the girl, spiral = where the light winds around her, from = empty room for the fade-in)
@@ -1367,7 +1369,7 @@
     spStop();
     const my = SP.token, C = ST.sparkle;
     const baseKey = cfg.frames[0], base = imgByKey[baseKey], charImg = spLight(cfg.char);
-    const from = cfg.from ? imgByKey[cfg.from] : null, plate = imgByKey[C.plate];
+    const from = cfg.from ? imgByKey[cfg.from] : null, plate = imgByKey[cfg.plate || C.plate];
     const endKey = cfg.next && STEPS[cfg.next] ? STEPS[cfg.next].frames[0] : null, endImg = endKey ? imgByKey[endKey] : null;
     const t0 = performance.now();
     const waitReady = () => {
@@ -1394,7 +1396,7 @@
         g.globalCompositeOperation = "destination-in"; g.fillStyle = gr; g.fillRect(0, 0, W, H);
         return c;
       };
-      const spT = place(spTinted()), spR = place(L);
+      const spT = place(spTinted(cfg.tint)), spR = place(L);
       // --- the three round buttons top-left stay crisp above the light
       const hud = cv(), hg = hud.getContext("2d");
       hg.drawImage(base, 0, 0, W, H);
