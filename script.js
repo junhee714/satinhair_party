@@ -686,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=44`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=45`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1417,7 +1417,7 @@
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
         const rq = from ? xfClamp((t - C.rampMs[0]) / (C.rampMs[1] - C.rampMs[0])) : 1;
         ctx.drawImage(from && rq < 1 ? from : base, 0, 0, W, H);                   // the room (the girl is part of it, but she is drawn again on top below)
-        const bloom = 1 - Math.pow(1 - xfClamp(t / C.bloomMs), 2);                  // comes up fast right from the first frame
+        const bloom = xfSmooth((t - C.bloomDelayMs) / C.bloomMs);                  // the light fades IN softly (after the girl has started to show) instead of popping up first
         // the light is wiped away from the bottom up to the very top edge of the screen (instead of just dimming)
         const wp = xfSmooth((t - C.wipeMs[0]) / (C.wipeMs[1] - C.wipeMs[0]));
         const fx = xfClamp((t - C.fadeMs[0]) / (C.fadeMs[1] - C.fadeMs[0]));
@@ -1525,7 +1525,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=44";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=45";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);

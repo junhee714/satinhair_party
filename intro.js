@@ -42,8 +42,8 @@
   // ---- letter (design px): width 330, final top 175 (upright, centred)
   const LW = 356, LET_X = (402 - LW) / 2, LET_TOP = 174, LET_PEEK = 14, PAD = 2;
   // button on the letter (design px, relative to the letter's top): 162.6 x 41.8, under the "입장 조건" box
-  const BW = 138.2, BH = 35.6, BTN_DY = 345.3;
-  const BS = 1.2;                                       // the button is drawn / shown 1.2x bigger about its centre (keep in sync with HOTSPOT_RECTS.introInvite)
+  const BW = 138.2, BH = 35.6, BTN_DY = 350.8;
+  const BS = 1.0;                                       // the button is drawn / shown 1.0x about its centre (keep in sync with HOTSPOT_RECTS.introInvite)
   const BTN_IMG_W = 770 / 5.1955, BTN_IMG_H = 237 / 5.1955, BTN_PAD = 26 / 5.1955;   // button image carries its own soft shadow (baked in), so the canvas copy and the real button are pixel-identical
   let btnLive = false;                                  // true once the real <button> has taken over from the canvas copy        // centre of the blank margin under the 입장 조건 box (box bottom y457 .. ornaments y552 -> centre 507)
 
