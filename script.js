@@ -686,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=43`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=44`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1420,6 +1420,8 @@
         const bloom = 1 - Math.pow(1 - xfClamp(t / C.bloomMs), 2);                  // comes up fast right from the first frame
         // the light is wiped away from the bottom up to the very top edge of the screen (instead of just dimming)
         const wp = xfSmooth((t - C.wipeMs[0]) / (C.wipeMs[1] - C.wipeMs[0]));
+        const fx = xfClamp((t - C.fadeMs[0]) / (C.fadeMs[1] - C.fadeMs[0]));
+        const fo = Math.pow(1 - fx, C.fadePow);                   // opacity: drops quickly at first, then a long soft tail that melts to nothing (no sudden cut)
         const yE = H * (1 - wp) * (1 + C.wipeSoft), soft = H * C.wipeSoft;
         const wipe = (g) => {
           if (wp <= 0) return;
@@ -1427,13 +1429,13 @@
           gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
           g.globalCompositeOperation = "destination-in"; g.fillStyle = gr; g.fillRect(0, 0, W, H);
         };
-        if (wp < 1) {
+        if (fo > 0.002) {
           // 1) the spiral of light, BEHIND the girl
           lb.globalCompositeOperation = "source-over"; lb.globalAlpha = 1;
           lb.clearRect(0, 0, W, H);
           lb.drawImage(spT, 0, 0);
           wipe(lb);
-          ctx.globalAlpha = C.strength * bloom * (1 - wp);        // dims while it is wiped upward, so nothing is left lingering at the top
+          ctx.globalAlpha = C.strength * bloom * fo;        // dims while it is wiped upward, so nothing is left lingering at the top
           ctx.drawImage(lightBuf, 0, 0);
           // 2) one brighter stream that runs up the spiral (bottom -> top), also behind her
           const q = xfClamp((t - C.bandMs[0]) / (C.bandMs[1] - C.bandMs[0]));
@@ -1447,7 +1449,7 @@
             bb.globalCompositeOperation = "destination-in"; bb.fillStyle = gr; bb.fillRect(0, 0, W, H);
             wipe(bb);
             ctx.globalCompositeOperation = "lighter";
-            ctx.globalAlpha = C.bandGain * bloom * (1 - wp) * Math.sin(Math.PI * q);
+            ctx.globalAlpha = C.bandGain * bloom * fo * Math.sin(Math.PI * q);
             ctx.drawImage(bandBuf, 0, 0);
           }
         }
@@ -1523,7 +1525,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=43";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=44";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);

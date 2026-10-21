@@ -148,7 +148,7 @@ window.GAME_DATA = {
                bandMs: [0, 1200], bandFrom: 0.8, bandTo: -0.1, bandHalf: 0.13, bandGain: 0.45,
                //  wipeMs = 빛이 아래→위로 지워지며 화면 맨 위 끝까지 올라가 사라지는 구간(wipeSoft = 지워지는 경계의 부드러움, 화면 높이 비율)
                //  legsMs/endMs/boxRows/plate = 끝에 자막 상자가 나타날 때: 상자 자리(boxRows)의 다리가 먼저 빈 방(plate)으로 바뀌고, 그 위로 다음 화면이 자연스럽게 나타남 (흰색 페이드 없음)
-               wipeMs: [720, 1520], wipeSoft: 0.16,
+               wipeMs: [720, 1620], wipeSoft: 0.5, fadeMs: [680, 1620], fadePow: 2.2,
                legsMs: [1250, 1380], endMs: [1290, 1530], boxRows: [0.598, 0.728], plate: "bl-12bg",
                rampMs: [0, 1040], rampFrom: 0.97, rampTo: -0.1, rampHalf: 0.16 },
     transform: { sfxDelayMs: 250, delayMs: 300, strength: 0.72, totalMs: 2200, light: "assets/fx/sparkle-light.webp", char: "assets/fx/sparkle-char.png" },
@@ -215,16 +215,16 @@ window.GAME_DATA = {
       // 10: ▶ → 탭하면 흰 페이드로 11 (변신 효과) 로
       bl10: { route: "blossom", kind: "dialogue", frames: ["bl-10"], text: "WI", arrow: "W", next: "p11" },
       // 11: 변신 반짝임 (자막 없음, 끝나면 자동으로 13). veil = 흰색 부드러운 페이드로 들어옴, transient = 되돌리기 때 건너뜀
-      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", char: "assets/fx/w4-char12.webp?v=43", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p13" },
+      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", char: "assets/fx/w4-char12.webp?v=44", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p13" },
       // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림.  왼쪽 카드를 누르면 → 14 (스크런치 포즈로 변신)
       p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", cardSet: "B", cards: { L: { go: "p14" } } },
       // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
-      p14: { route: "party", kind: "transform", frames: ["bl-15s"], char: "assets/fx/w4-char14.webp?v=43", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p15" },
+      p14: { route: "party", kind: "transform", frames: ["bl-15s"], char: "assets/fx/w4-char14.webp?v=44", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p15" },
       p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
       p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", cardSet: "B", cards: { R: { go: "p18" } } },
       // 18(=블썸 20 반짝임): 파우치 포즈로 변신, 끝나면 자동으로 19 자막
-      p18: { route: "party", kind: "transform", frames: ["bl-19s"], char: "assets/fx/w4-char18.webp?v=43", spiral: { cx: 0.477, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p19" },
+      p18: { route: "party", kind: "transform", frames: ["bl-19s"], char: "assets/fx/w4-char18.webp?v=44", spiral: { cx: 0.477, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p19" },
       p19: { route: "party", kind: "dialogue", frames: ["bl-19"], text: "WM", arrow: "W", next: "p20" },
       p20: { route: "party", kind: "dialogue", frames: ["bl-20"], text: "WN", arrow: "W", next: "h22" },
       // 23(커튼) → 22: 커튼이 열리며 파티장
