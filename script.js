@@ -738,7 +738,7 @@
     ["L", "R"].forEach((s) => { if (cards && cards[s]) patchSets[set][s] = fxSprite(cards[s].src, cards[s].rect, "card-patch"); });
   });
   story.cardSet = "A";
-  if (ST.pouchCard) { layerImg(ST.pouchCard.src); layerImg(ST.pouchCard.char); }
+  Object.values(ST.pouchCards || {}).forEach((p) => { layerImg(p.src); layerImg(p.char); });
   [FX, FX_SUN].forEach((F) => {
     (F.petals || []).forEach((p) => layerImg(p.src));
     Object.values(F.marks || {}).forEach((m) => layerImg(m.src));
@@ -1068,9 +1068,9 @@
       els.forEach((el) => el.remove());
     }
   }
-  function startPouchCard({ settled = false } = {}) {
+  function startPouchCard({ settled = false, key = null } = {}) {
     stopPouchCard();
-    const P = ST.pouchCard;
+    const P = ST.pouchCard && ST.pouchCards && ST.pouchCards[key] ? { ...ST.pouchCard, ...ST.pouchCards[key] } : null;
     if (!P) return;
     // the whole thing lives in a box that is cut off above the speech box (clipTop = its top edge, 0~1 of the picture height), so the card and the girl's legs never come in front of the caption box
     const wrap = document.createElement("div");
@@ -1699,7 +1699,7 @@
     if (cfg.fx === "marks" && !keep) storyLater(() => startMarks({ pop: !settled }), settled ? 0 : ST.marks.startDelayMs);
     if (cfg.fx === "pouchcard") {
       const pcDelay = settled ? 0 : (textDelayMs != null ? textDelayMs : instant ? 0 : TY.afterFadeMs) + ((ST.pouchCard && ST.pouchCard.delayMs) || 0);
-      storyLater(() => startPouchCard({ settled }), pcDelay);
+      storyLater(() => startPouchCard({ settled, key: cfg.pouch }), pcDelay);
     }
     if (cfg.kind === "result") storyLater(() => showToast(ST.endToast, 2600, "top"), 1100);
   }
