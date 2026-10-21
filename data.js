@@ -104,16 +104,16 @@ window.GAME_DATA = {
     images: [
       "nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
       "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10",
-      "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15s", "bl-16", "bl-16p", "bl-19", "bl-19s", "bl-20", "bl-22", "bl-23", "bl-24",
+      "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15c", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
       "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10",   // 선셋 허니 루트 (와이드)
-      "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15s", "sw-16",                         // 선셋 11~16 (드레스룸, 와이드)
+      "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16",                         // 선셋 11~16 (드레스룸, 와이드)
       "sn-12", "sn-18c", "sn-19", "sn-20", "sn-21", "sn-22", "sn-23", "sn-24",         // 선셋 18~24 (아직 예전 그림: 새 그림이 오면 와이드로 교체)
     ],
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
     wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
-                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15s", "bl-16", "bl-16p", "bl-19", "bl-19s", "bl-20", "bl-22", "bl-23", "bl-24",
-                                                 "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15s", "sw-16"] },
+                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15c", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
+                                                 "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
       // nerd: 넓은 그림(와이드 캔버스)을 쓰는 루트. rects = 이 루트에서만 쓰는 버튼/카드 위치 (402x874 기준 0~1 비율; 위의 HOTSPOT_RECTS 를 덮어씀)
@@ -137,6 +137,8 @@ window.GAME_DATA = {
     //  delayMs  흰 페이드가 걷히기 시작한 뒤 효과 시작까지 / strength 반짝임 세기 / totalMs 효과 전체 길이
     //  afterFx: 반짝임이 끝난 직후 다음 화면(자막)이 올라오는 속도 (크로스페이드 ms / 타자 시작 대기 ms)
     afterFx: { fadeMs: 180, textDelayMs: 40 },
+    //  sparkleStyle: "classic" = 선셋 18→19 에서 쓰던 반짝임(나선 빛이 지나 뒤에서 피어오르고 빛줄기가 한 번 훑고 지나감, 2.2초) 을 모든 변신에 사용.  "new" = 나선 빛 올라가며 사라지는 효과(아래 sparkle 설정)
+    sparkleStyle: "classic",
     //  routeStart: 너드 지나 5 의 카드(go:"@...")를 누르면 처음 들어가는 화면
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },
     // 블썸 11 (와이드 반짝임 그림): 빛이 차오르고(bloomMs) → 밝은 띠가 아래→위로 한 번 훑고(bandMs, 그림 높이 비율 bandFrom→bandTo, 폭 bandHalf) → 사라짐(fadeMs).  totalMs 는 아래 transform 과 같이 씀
@@ -187,9 +189,9 @@ window.GAME_DATA = {
       sn10: { route: "sunset", kind: "dialogue", frames: ["sw-10"], text: "XI", arrow: "X", next: "sp11" },
 
       // ---- 선셋 11~16 (와이드 드레스룸) → 18~24 는 예전 그림 ----
-      sp11: { route: "sparty", kind: "transform", frames: ["sw-12"], from: "sw-12bg", plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char12.webp?v=46", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "sp13" },
+      sp11: { route: "sparty", kind: "transform", frames: ["sw-12"], from: "sw-12bg", plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char12.webp?v=46", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp13" },
       sp13: { route: "sparty", kind: "choice", frames: ["sw-13"], text: "XJ", arrow: "X", cardSet: "S2", cards: { L: { go: "sp14" } } },
-      sp14: { route: "sparty", kind: "transform", frames: ["sw-15s"], plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char14.webp?v=46", spiral: { cx: 0.487, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "sp15" },
+      sp14: { route: "sparty", kind: "transform", frames: ["sw-15c"], plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char14.webp?v=46", spiral: { cx: 0.487, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp15" },
       sp15: { route: "sparty", kind: "dialogue", frames: ["sw-15"], text: "XK", arrow: "X", next: "sp16" },
       sp16: { route: "sparty", kind: "choice", frames: ["sw-16"], text: "XL", arrow: "X", cardSet: "S2", cards: { R: { go: "sp18" } } },
       sp18: { route: "sparty0", kind: "transform", frames: ["sn-18c"], char: "assets/fx/sn-char18.png", tint: "gold", veil: "fast", transient: true, next: "sp19" },
@@ -220,16 +222,16 @@ window.GAME_DATA = {
       // 10: ▶ → 탭하면 흰 페이드로 11 (변신 효과) 로
       bl10: { route: "blossom", kind: "dialogue", frames: ["bl-10"], text: "WI", arrow: "W", next: "p11" },
       // 11: 변신 반짝임 (자막 없음, 끝나면 자동으로 13). veil = 흰색 부드러운 페이드로 들어옴, transient = 되돌리기 때 건너뜀
-      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", char: "assets/fx/w4-char12.webp?v=45", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p13" },
+      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", char: "assets/fx/w4-char12.webp?v=45", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p13" },
       // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림.  왼쪽 카드를 누르면 → 14 (스크런치 포즈로 변신)
       p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", cardSet: "B", cards: { L: { go: "p14" } } },
       // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
-      p14: { route: "party", kind: "transform", frames: ["bl-15s"], char: "assets/fx/w4-char14.webp?v=45", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p15" },
+      p14: { route: "party", kind: "transform", frames: ["bl-15c"], char: "assets/fx/w4-char14.webp?v=45", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p15" },
       p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
       p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", cardSet: "B", cards: { R: { go: "p18" } } },
       // 18(=블썸 20 반짝임): 파우치 포즈로 변신, 끝나면 자동으로 19 자막
-      p18: { route: "party", kind: "transform", frames: ["bl-19s"], char: "assets/fx/w4-char18.webp?v=45", spiral: { cx: 0.477, top: 0.19, bot: 0.74 }, veil: "fast", fxDelayMs: 0, transient: true, next: "p19" },
+      p18: { route: "party", kind: "transform", frames: ["bl-19c"], char: "assets/fx/w4-char18.webp?v=45", spiral: { cx: 0.477, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p19" },
       p19: { route: "party", kind: "dialogue", frames: ["bl-19"], text: "WM", arrow: "W", next: "p20" },
       p20: { route: "party", kind: "dialogue", frames: ["bl-20"], text: "WN", arrow: "W", next: "h22" },
       // 23(커튼) → 22: 커튼이 열리며 파티장

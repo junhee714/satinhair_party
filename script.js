@@ -1157,79 +1157,88 @@
   };
   const xfClamp = (x) => Math.max(0, Math.min(1, x));
   const xfSmooth = (x) => { x = xfClamp(x); return x * x * (3 - 2 * x); };
-  const xfCanvasOf = () => { const c = document.createElement("canvas"); c.width = XW; c.height = XH; return c; };
+  const xfCanvasOf = (w) => { const c = document.createElement("canvas"); c.width = w || XW; c.height = XH; return c; };
 
-  function xfBuild(base, charImg, tint) {
-    const light = XF.light;
-    const L = {};
+  // The classic sparkle (the one of 선셋 18→19) works on both picture kinds:
+  //   narrow (804 px = the 402x874 frame, xfCanvas)   or   wide (1040 px = the 520x874 canvas, spCanvas); `sp` = what is different for the wide one
+  function xfSpecFor(baseImg, cfg) {
+    const wide = !!(baseImg && baseImg.dataset && baseImg.dataset.wide && WIDE);
+    if (!wide) return { wide: false, cw: XW, ox: 0, layer: xfLayer, canvas: xfCanvas, ctx: xfCtx, cx: null, hud: null };
+    const cw = WIDE.canvasW * XS;
+    return { wide: true, cw, ox: WIDE.frameX * XS, layer: spLayer, canvas: spCanvas, ctx: spCtx, cx: cfg && cfg.spiral ? cfg.spiral.cx * cw : null, hud: ST.sparkle.hud, hudR: ST.sparkle.hudR };
+  }
+
+  function xfBuild(base, charImg, tint, sp) {
+    const light = XF.light, CW = sp.cw;
+    const L = { sp };
     L.base = base;
     L.tinted = document.createElement("canvas"); L.tinted.width = light.naturalWidth; L.tinted.height = light.naturalHeight;
     let g = L.tinted.getContext("2d");
     g.drawImage(light, 0, 0);
-    g.globalCompositeOperation = "source-atop";             // faint rose tint so the white light blends with the pink room
+    g.globalCompositeOperation = "source-atop";             // faint tint so the white light blends with the room
     g.fillStyle = XF_TINTS[tint] || XF_TINTS.rose; g.fillRect(0, 0, L.tinted.width, L.tinted.height);
 
-    L.charLayer = xfCanvasOf();
+    L.charLayer = xfCanvasOf(CW);
     let c = L.charLayer.getContext("2d");
     c.imageSmoothingQuality = "high";
-    c.drawImage(base, 0, 0, XW, XH);
+    c.drawImage(base, 0, 0, CW, XH);
     c.globalCompositeOperation = "destination-in";
-    c.drawImage(charImg, 0, 0, XW, XH);
+    c.drawImage(charImg, 0, 0, CW, XH);
 
     // the three top-left buttons stay crisp above the light
-    const BTNS = [[59, 63], [126, 63], [184, 63]];
-    L.btnLayer = xfCanvasOf();
+    L.btnLayer = xfCanvasOf(CW);
     const bl = L.btnLayer.getContext("2d");
-    bl.drawImage(base, 0, 0, XW, XH);
-    const m2 = xfCanvasOf(), mc = m2.getContext("2d");
-    BTNS.forEach(([x, y]) => {
-      const gr = mc.createRadialGradient(x * XS, y * XS, 22 * XS, x * XS, y * XS, 27 * XS);
+    bl.drawImage(base, 0, 0, CW, XH);
+    const m2 = xfCanvasOf(CW), mc = m2.getContext("2d");
+    const BTNS = sp.wide ? sp.hud.map(([x, y]) => [x * CW, y * XH, sp.hudR[0] * CW, sp.hudR[1] * CW]) : [[59, 63], [126, 63], [184, 63]].map(([x, y]) => [x * XS, y * XS, 22 * XS, 27 * XS]);
+    BTNS.forEach(([x, y, r0, r1]) => {
+      const gr = mc.createRadialGradient(x, y, r0, x, y, r1);
       gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
-      mc.fillStyle = gr; mc.fillRect(0, 0, XW, XH);
+      mc.fillStyle = gr; mc.fillRect(0, 0, CW, XH);
     });
     bl.globalCompositeOperation = "destination-in"; bl.drawImage(m2, 0, 0);
 
-    L.glowLayer = xfCanvasOf();
+    L.glowLayer = xfCanvasOf(CW);
     const gl = L.glowLayer.getContext("2d");
     gl.drawImage(L.charLayer, 0, 0);
     const hg = gl.createLinearGradient(0, 0, 0, XH);        // keep head / face out of the glow
     hg.addColorStop(0, "rgba(0,0,0,1)"); hg.addColorStop(60 / 874, "rgba(0,0,0,1)");
     hg.addColorStop(190 / 874, "rgba(0,0,0,0)"); hg.addColorStop(1, "rgba(0,0,0,0)");
-    gl.globalCompositeOperation = "destination-out"; gl.fillStyle = hg; gl.fillRect(0, 0, XW, XH);
+    gl.globalCompositeOperation = "destination-out"; gl.fillStyle = hg; gl.fillRect(0, 0, CW, XH);
 
-    L.headLayer = xfCanvasOf();
+    L.headLayer = xfCanvasOf(CW);
     const hl = L.headLayer.getContext("2d");
     hl.drawImage(L.charLayer, 0, 0);
     const hg2 = hl.createLinearGradient(0, 0, 0, XH);       // head / face area goes back over the front light
     hg2.addColorStop(0, "rgba(0,0,0,1)"); hg2.addColorStop(105 / 874, "rgba(0,0,0,1)");
     hg2.addColorStop(185 / 874, "rgba(0,0,0,0)"); hg2.addColorStop(1, "rgba(0,0,0,0)");
-    hl.globalCompositeOperation = "destination-in"; hl.fillStyle = hg2; hl.fillRect(0, 0, XW, XH);
+    hl.globalCompositeOperation = "destination-in"; hl.fillStyle = hg2; hl.fillRect(0, 0, CW, XH);
 
     // the light only exists from Jina's feet up to the top of the screen
-    L.lightMask = xfCanvasOf();
+    L.lightMask = xfCanvasOf(CW);
     const lm = L.lightMask.getContext("2d");
     const lg = lm.createLinearGradient(0, 0, 0, XH);
     lg.addColorStop(0, "rgba(0,0,0,1)"); lg.addColorStop(500 / 874, "rgba(0,0,0,1)");
     lg.addColorStop(560 / 874, "rgba(0,0,0,0.78)"); lg.addColorStop(620 / 874, "rgba(0,0,0,0.42)");
     lg.addColorStop(670 / 874, "rgba(0,0,0,0.12)"); lg.addColorStop(710 / 874, "rgba(0,0,0,0)"); lg.addColorStop(1, "rgba(0,0,0,0)");
-    lm.fillStyle = lg; lm.fillRect(0, 0, XW, XH);
-    L.lightBuf = xfCanvasOf();
-    L.streamBuf = xfCanvasOf();
+    lm.fillStyle = lg; lm.fillRect(0, 0, CW, XH);
+    L.lightBuf = xfCanvasOf(CW);
+    L.streamBuf = xfCanvasOf(CW);
     return L;
   }
 
-  function xfPlaceLight(target, img) {
+  function xfPlaceLight(target, img, L) {
     const kx = XC.scaleX * XS, ky = XC.scaleY * XS;
-    const cx = XC.anchor.sx * XS;
+    const cx = L && L.sp.cx != null ? L.sp.cx : XC.anchor.sx * XS + (L ? L.sp.ox : 0);   // wide: the light winds around the girl's own centre line
     const y0 = (XC.mapY0 - XC.assetY0 * XC.scaleY) * XS;
     target.drawImage(img, cx - XC.anchor.ax * kx, y0, XF.light.naturalWidth * kx, XF.light.naturalHeight * ky);
   }
 
   function xfDraw(L, t) {
-    const ctx = xfCtx, STR = ST.transform.strength;
+    const ctx = L.sp.ctx, STR = ST.transform.strength, CW = L.sp.cw;
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
-    ctx.drawImage(L.base, 0, 0, XW, XH);
+    ctx.drawImage(L.base, 0, 0, CW, XH);
     const m = t - XC.startDelay;
     if (m <= 0 || m >= XC.fade[1]) return;                  // clean picture before / after
 
@@ -1240,8 +1249,8 @@
     // 1) the spiral of light, behind the girl
     ctx.globalAlpha = g;
     const lb = L.lightBuf.getContext("2d");
-    lb.globalCompositeOperation = "source-over"; lb.clearRect(0, 0, XW, XH);
-    xfPlaceLight(lb, L.tinted);
+    lb.globalCompositeOperation = "source-over"; lb.clearRect(0, 0, CW, XH);
+    xfPlaceLight(lb, L.tinted, L);
     lb.globalCompositeOperation = "destination-in"; lb.drawImage(L.lightMask, 0, 0);
     ctx.drawImage(L.lightBuf, 0, 0);
 
@@ -1254,13 +1263,13 @@
       const yAsset = XC.spiralY1 + (XC.spiralY0 - XC.spiralY1) * xfSmooth(q);
       const yc = (XC.mapY0 + (yAsset - XC.assetY0) * XC.scaleY) * XS;
       sctx.globalCompositeOperation = "source-over";
-      sctx.clearRect(0, 0, XW, XH);
-      xfPlaceLight(sctx, XF.light);
+      sctx.clearRect(0, 0, CW, XH);
+      xfPlaceLight(sctx, XF.light, L);
       const half = 160 * XS;
       const grad = sctx.createLinearGradient(0, yc - half, 0, yc + half);
       grad.addColorStop(0, "rgba(0,0,0,0)"); grad.addColorStop(0.5, "rgba(0,0,0,1)"); grad.addColorStop(1, "rgba(0,0,0,0)");
       sctx.globalCompositeOperation = "destination-in";
-      sctx.fillStyle = grad; sctx.fillRect(0, 0, XW, XH);
+      sctx.fillStyle = grad; sctx.fillRect(0, 0, CW, XH);
       sctx.drawImage(L.lightMask, 0, 0);
       front = xfSmooth((q - 0.25) / 0.4);                   // 0 = behind her ... 1 = in front of her
       bump = Math.sin(Math.PI * q);
@@ -1295,8 +1304,9 @@
     XF.token++;
     window.cancelAnimationFrame(XF.raf);
     xfLayer.classList.remove("on");
+    spLayer.classList.remove("on");
   }
-  function xfRun(onEnd, baseKey, charSrc, tint) {
+  function xfRun(onEnd, baseKey, charSrc, tint, cfg) {
     xfStop();
     const my = XF.token;
     const baseImg = imgByKey[baseKey || "bl-12"];
@@ -1310,9 +1320,12 @@
         XF.raf = window.requestAnimationFrame(waitReady);
         return;
       }
-      if (!XF.built || XF.built.base !== baseImg || XF.built.charImg !== charImg || XF.built.tint !== tint) { XF.built = xfBuild(baseImg, charImg, tint); XF.built.charImg = charImg; XF.built.tint = tint; }
+      const sp = xfSpecFor(baseImg, cfg);
+      const cxKey = sp.cx == null ? "" : Math.round(sp.cx);
+      if (sp.wide && (sp.canvas.width !== sp.cw || sp.canvas.height !== XH)) { sp.canvas.width = sp.cw; sp.canvas.height = XH; }
+      if (!XF.built || XF.built.base !== baseImg || XF.built.charImg !== charImg || XF.built.tint !== tint || XF.built.cxKey !== cxKey) { XF.built = xfBuild(baseImg, charImg, tint, sp); XF.built.charImg = charImg; XF.built.tint = tint; XF.built.cxKey = cxKey; }
       const L = XF.built;
-      xfLayer.classList.add("on");
+      sp.layer.classList.add("on");
       layoutPhotoScene(sceneStory);
       const TOTAL = ST.transform.totalMs;
       const tStart = performance.now();
@@ -1322,7 +1335,7 @@
         const t = now - tStart;
         xfDraw(L, Math.min(t, TOTAL));
         if (t < TOTAL) { XF.raf = window.requestAnimationFrame(tick); return; }
-        xfLayer.classList.remove("on");
+        sp.layer.classList.remove("on");
         if (onEnd) onEnd();
       };
       XF.raf = window.requestAnimationFrame(tick);
@@ -1339,10 +1352,7 @@
   const spCanvas = document.getElementById("spCanvas");
   const spCtx = spCanvas.getContext("2d");
   const SP = { raf: 0, token: 0, lights: {}, buf: null };
-  function spLight(src) {
-    if (!SP.lights[src]) { const im = new Image(); im.src = src; SP.lights[src] = im; }
-    return SP.lights[src];
-  }
+  function spLight(src) { return xfCharFor(src); }      // (the cut-outs of the girl are shared by both sparkle styles)
   // the light layers of the sparkle screens are fetched + decoded ahead of time, so the effect never waits for them
   window.setTimeout(() => Object.values(STEPS).forEach((c) => { if (c.spiral && c.char) { const im = spLight(c.char); if (im.decode) im.decode().catch(() => {}); } }), 3500);
   function spStop() {
@@ -1596,7 +1606,7 @@
     const frames = cfg.frames;
     // reveal: the picture first shows frames[0] (e.g. with sparkles), then slowly melts into reveal.to
     const RV = cfg.reveal || null;
-    if (!keep) storyShow(RV && settled ? RV.to : (cfg.kind === "transform" && cfg.from && !settled ? cfg.from : frames[0]), { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
+    if (!keep) storyShow(RV && settled ? RV.to : (cfg.kind === "transform" && cfg.from && !settled && ST.sparkleStyle !== "classic" ? cfg.from : frames[0]), { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
     let revealTextDelay = null;
     if (RV && !settled) {
       const base = instant ? 0 : ST.fadeMs;
@@ -1625,7 +1635,7 @@
       storyLater(() => glossRun(() => { glossDone = true; tryFinish(); }), instant ? 0 : TY.afterFadeMs);
     }
     if (live && cfg.kind === "transform") {
-      storyLater(() => (cfg.spiral ? spRun(() => { glossDone = true; tryFinish(); }, cfg) : xfRun(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.char, cfg.tint)), fxDelayMs != null ? fxDelayMs : 0);
+      storyLater(() => (cfg.spiral && ST.sparkleStyle !== "classic" ? spRun(() => { glossDone = true; tryFinish(); }, cfg) : xfRun(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.char, cfg.tint, cfg)), fxDelayMs != null ? fxDelayMs : 0);
     }
     if (cfg.text) {
       if (settled) typerShow(cfg.text, { instant: true, onDone: done });
