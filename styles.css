@@ -57,6 +57,10 @@ body {
 @media (min-width: 431px) {
   .app { border-radius: 36px; height: min(90vh, 900px); }
 }
+/* PC / tablet: the card is as wide as the whole wide picture (520:874), so the picture's left/right edges are not cropped.  Phones are unchanged. */
+@media (min-width: 431px) {
+  .app { max-width: none; width: min(95vw, calc(min(90vh, 900px) * 0.5949)); }
+}
 
 /* PC / tablet only: the area around the phone-sized game shows the pink satin curtain.
    It is dimmed (and darker towards the edges) so the game stays the brightest thing on screen.
