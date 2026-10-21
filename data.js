@@ -37,8 +37,8 @@ window.HOTSPOT_RECTS = {
   // 편지 화면의 선물받기 / 다시하기 버튼 (145x42px, 가로 가운데, 145x42px)
   letterLayer: { x: -0.397985, y: -0.068650, w: 1.795970, h: 1.137300 },   // 편지 캔버스 (기준 화면보다 사방으로 PAD 만큼 큼: letter.js PADX 160 / PADY 60)
   letterIcons: { x: -0.024397, y: 0.049969, w: 0.469778, h: 0.073307 },   // 편지 화면 위쪽 동그란 아이콘 3개 (블썸, 402x874 기준 비율)
-  letterGift:  { x: 0.28357, y: 0.7732, w: 0.43284, h: 0.05767 },
-  letterRetry: { x: 0.28357, y: 0.8445, w: 0.43284, h: 0.05767 },
+  letterGift:  { x: 0.28357, y: 0.7512, w: 0.43284, h: 0.05767 },
+  letterRetry: { x: 0.28357, y: 0.8225, w: 0.43284, h: 0.05767 },
   // 첫 화면 인트로의 '초대장 받기' 버튼: 편지지의 입장 조건 박스 아래, 봉투 입구 안쪽 여백 (138.2x35.5px / 402x874). 선물받기 버튼(145x42)보다 약간 작게
   introInvite: { x: 0.27885, y: 0.58325, w: 0.44240, h: 0.06263 },   // 버튼 본체 138.2x35.6 + 둘레 5px 그림자 여백 (이미지에 그림자가 구워져 있음)
 };
@@ -138,11 +138,14 @@ window.GAME_DATA = {
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },
     // 블썸 11 (와이드 반짝임 그림): 빛이 차오르고(bloomMs) → 밝은 띠가 아래→위로 한 번 훑고(bandMs, 그림 높이 비율 bandFrom→bandTo, 폭 bandHalf) → 사라짐(fadeMs).  totalMs 는 아래 transform 과 같이 씀
     //  baseGain 빛 전체 세기(1 = 디자인 원본 밝기), bandGain 띠가 지나갈 때 더해지는 밝기
-    sparkle: { startDelayMs: 0, sfxDelayMs: 40, totalMs: 1800, bloomMs: 220, baseGain: 1.0, bandGain: 0.6, bandMs: [0, 1050], bandFrom: 0.8, bandTo: 0.02, bandHalf: 0.2,
-               //  사라질 때: 빛 레이어가 불투명도로 서서히 사라지며(fadeMs, 스크린 합성) 지나 몸 위로 겹쳐 지나가고(frontMs/frontGain, 얼굴 제외 headFadeFrom~To = 머리 위 기준 그림 높이 비율),
-               //  같은 때 화면 전체에 흰색 페이드가 whiteMs 동안(약 0.5초) 올라갔다 내려옴 (whitePeak = 가장 하얀 순간의 세기)
-               fadeMs: [950, 1700], frontMs: [500, 1100], frontGain: 6, headFadeFrom: 0.06, headFadeTo: 0.14, whiteMs: [1150, 1650], whitePeak: 0.5,
-               rampFillGain: 0.3, rampMs: [0, 1050], rampFrom: 0.97, rampTo: -0.1, rampHalf: 0.16 },
+    sparkle: { startDelayMs: 0, sfxDelayMs: 40, bloomMs: 220, baseGain: 1.0, bandGain: 0.6, bandMs: [0, 1150], bandFrom: 0.8, bandTo: 0.02, bandHalf: 0.2,
+               //  지워지기(wipe): 아래→위로 부드러운 경계(wipeEdge)가 훑고 지나가며 빛과 얼굴 앞 반짝임을 함께 닦아냄 (그림 높이 비율 wipeFrom→wipeTo, 구간 wipeMs). 경계에 얇은 빛(glow)이 실림
+               wipeMs: [950, 2050], wipeEdge: 0.09, wipeFrom: 1.12, wipeTo: -0.14, glowHalf: 0.07, glowGain: 0.26,
+               //  glint: 지나 앞(얼굴·머리·드레스)에 뜨는 반짝이 (size 그림 폭 비율, inMs 나타나는 시간대, growMs 커지는 시간, gain 세기)
+               glint: { size: 0.022, inMs: [0, 520], growMs: 260, gain: 0.95, twinkle0: 0.72, twinkleSpeed: 0.009 },
+               rampMs: [0, 1150], rampFrom: 0.97, rampTo: -0.1, rampHalf: 0.16 },
+    //  얼굴 앞 반짝이 위치 [x, y, 크기배율, 나타나는 순서] (캔버스 520x874 비율)
+    frontSparks: { "12": [[0.561,0.185,1.30,0.14],[0.504,0.124,1.13,0.64],[0.488,0.183,1.20,0.66],[0.406,0.243,1.22,0.20],[0.446,0.213,0.72,0.06],[0.517,0.244,0.90,0.99],[0.583,0.251,1.30,0.36],[0.442,0.154,1.15,0.25],[0.525,0.156,0.70,0.03],[0.444,0.252,1.45,0.02],[0.525,0.193,1.34,0.98],[0.573,0.217,1.43,0.74],[0.481,0.247,1.16,0.55]], "16": [[0.571,0.178,0.96,0.23],[0.523,0.133,0.91,0.22],[0.473,0.175,1.56,0.60],[0.496,0.255,0.72,0.15],[0.458,0.210,1.12,0.60],[0.504,0.223,1.40,0.36],[0.367,0.257,1.17,0.23],[0.511,0.173,0.76,0.70],[0.602,0.251,1.03,0.54],[0.550,0.217,1.24,0.48],[0.410,0.251,1.36,0.05],[0.450,0.243,1.29,0.85],[0.485,0.142,1.22,0.15],[0.560,0.261,1.16,0.92],[0.511,0.357,0.92,0.17],[0.339,0.292,1.45,0.24],[0.640,0.283,1.27,0.72],[0.383,0.414,1.57,0.64],[0.367,0.338,0.89,0.87],[0.571,0.327,1.30,0.03],[0.469,0.437,0.95,0.46],[0.423,0.427,0.98,0.33],[0.454,0.292,1.27,0.24],[0.306,0.444,1.44,0.38],[0.464,0.347,1.03,0.51],[0.638,0.323,1.56,0.55]], "20": [[0.417,0.251,0.93,0.64],[0.504,0.251,1.22,0.17],[0.396,0.186,0.79,0.32],[0.561,0.256,1.07,0.20],[0.546,0.214,1.00,0.09],[0.500,0.200,1.06,0.21],[0.419,0.144,0.93,0.76],[0.465,0.168,1.28,0.60],[0.369,0.251,1.17,0.44],[0.394,0.218,0.87,0.51],[0.460,0.135,1.37,0.90],[0.433,0.208,1.57,0.01],[0.646,0.216,1.53,0.12],[0.592,0.209,1.00,0.24],[0.506,0.371,0.75,0.09],[0.531,0.426,0.94,0.31],[0.346,0.307,1.31,0.36],[0.429,0.384,0.84,0.64],[0.369,0.405,1.24,0.22],[0.542,0.309,0.78,0.76],[0.583,0.413,1.33,0.66],[0.485,0.453,1.41,0.17],[0.492,0.299,1.57,0.36],[0.467,0.410,0.95,0.62],[0.371,0.353,1.44,0.72],[0.413,0.420,1.11,0.35]] },
     transform: { sfxDelayMs: 250, delayMs: 300, strength: 0.72, totalMs: 2200, light: "assets/fx/sparkle-light.webp", char: "assets/fx/sparkle-char.png" },
     // 블썸 21→22: 커튼이 닫혀 있다가(fadeInMs 로 덮임) holdMs 뒤 양옆으로 걷히며(openMs) 파티장이 나타남. 자막은 커튼이 거의 걷힌 뒤 시작.
     curtain: { sfxPeakMs: 300, fadeInMs: 260, holdMs: 200, openMs: 1050, ease: "cubic-bezier(.5,0,.3,1)", textAtOpenFrac: 0.7 },
@@ -178,7 +181,7 @@ window.GAME_DATA = {
       sp11: { route: "sparty", kind: "transform", frames: ["sn-12"], char: "assets/fx/sn-char12.png", tint: "gold", veil: "fast", transient: true, next: "sp13" },
       sp13: { route: "sparty", kind: "choice", frames: ["sn-13"], text: "SJ", cardSet: "S2", cards: { L: { go: "sp15" } } },
       sp15: { route: "sparty", kind: "dialogue", frames: ["sn-15"], text: "SK", arrow: "SAK", next: "sp16" },
-      sp16: { route: "sparty", kind: "choice", frames: ["sn-16"], text: "SL", arrow: "SAL", cardSet: "S2", cards: { R: { go: "sp18" } } },
+      sp16: { route: "sparty", kind: "choice", frames: ["sn-16"], text: "SL", arrow: "SAL", tapGo: "R", cardSet: "S2", cards: { R: { go: "sp18" } } },
       sp18: { route: "sparty", kind: "transform", frames: ["sn-18c"], char: "assets/fx/sn-char18.png", tint: "gold", veil: "fast", transient: true, next: "sp19" },
       sp19: { route: "sparty", kind: "dialogue", frames: ["sn-19"], text: "SM", arrow: "SAK", next: "sp20" },
       sp20: { route: "sparty", kind: "dialogue", frames: ["sn-20"], text: "SN", arrow: "SAK", next: "sh22" },
@@ -207,16 +210,16 @@ window.GAME_DATA = {
       // 10: ▶ → 탭하면 흰 페이드로 11 (변신 효과) 로
       bl10: { route: "blossom", kind: "dialogue", frames: ["bl-10"], text: "WI", arrow: "W", next: "p11" },
       // 11: 변신 반짝임 (자막 없음, 끝나면 자동으로 13). veil = 흰색 부드러운 페이드로 들어옴, transient = 되돌리기 때 건너뜀
-      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", light: "assets/fx/w2-sparkle12.webp?v=39", fill: "assets/fx/w2-fill12.webp?v=39", headTop: 0.118, lightNear: "assets/fx/w2-lightnear12.webp?v=39", lightFar: "assets/fx/w2-lightfar12.webp?v=39", veil: "fast", fxDelayMs: 0, transient: true, next: "p13" },
+      p11: { route: "party", kind: "transform", frames: ["bl-12"], from: "bl-12bg", light: "assets/fx/w2-sparkle12.webp?v=36", sparks: "12", veil: "fast", fxDelayMs: 0, transient: true, next: "p13" },
       // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림.  왼쪽 카드를 누르면 → 14 (스크런치 포즈로 변신)
-      p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", cardSet: "B", cards: { L: { go: "p14" } } },
+      p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", tapGo: "L", cardSet: "B", cards: { L: { go: "p14" } } },
       // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
-      p14: { route: "party", kind: "transform", frames: ["bl-15s"], light: "assets/fx/w2-sparkle16.webp?v=39", fill: "assets/fx/w2-fill16.webp?v=39", headTop: 0.129, veil: "fast", fxDelayMs: 0, transient: true, next: "p15" },
+      p14: { route: "party", kind: "transform", frames: ["bl-15s"], light: "assets/fx/w2-sparkle16.webp?v=36", sparks: "16", veil: "fast", fxDelayMs: 0, transient: true, next: "p15" },
       p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
-      p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", cardSet: "B", cards: { R: { go: "p18" } } },
+      p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", tapGo: "R", cardSet: "B", cards: { R: { go: "p18" } } },
       // 18(=블썸 20 반짝임): 파우치 포즈로 변신, 끝나면 자동으로 19 자막
-      p18: { route: "party", kind: "transform", frames: ["bl-19s"], light: "assets/fx/w2-sparkle20.webp?v=39", fill: "assets/fx/w2-fill20.webp?v=39", headTop: 0.129, veil: "fast", fxDelayMs: 0, transient: true, next: "p19" },
+      p18: { route: "party", kind: "transform", frames: ["bl-19s"], light: "assets/fx/w2-sparkle20.webp?v=36", sparks: "20", veil: "fast", fxDelayMs: 0, transient: true, next: "p19" },
       p19: { route: "party", kind: "dialogue", frames: ["bl-19"], text: "WM", arrow: "W", next: "p20" },
       p20: { route: "party", kind: "dialogue", frames: ["bl-20"], text: "WN", arrow: "W", next: "h22" },
       // 23(커튼) → 22: 커튼이 열리며 파티장

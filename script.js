@@ -686,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=39`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=36`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1344,21 +1344,38 @@
     return SP.lights[src];
   }
   // the light layers of the sparkle screens are fetched + decoded ahead of time, so the effect never waits for them
-  window.setTimeout(() => Object.values(STEPS).forEach((c) => { if (c.light) { [c.light, c.fill, c.lightNear, c.lightFar].forEach((u) => { if (!u) return; const im = spLight(u); if (im.decode) im.decode().catch(() => {}); }); } }), 3500);
+  window.setTimeout(() => Object.values(STEPS).forEach((c) => { if (c.light) { const im = spLight(c.light); if (im.decode) im.decode().catch(() => {}); } }), 3500);
   function spStop() {
     SP.token++;
     window.cancelAnimationFrame(SP.raf);
     spLayer.classList.remove("on");
   }
-  function spRun(onEnd, baseKey, lightSrc, fromKey, headTop, fillSrc, nearSrc, farSrc) {
+  // soft four-point glint sprite (drawn once) – used for the sparkles that sit in front of the girl
+  function spSprite() {
+    if (SP.star) return SP.star;
+    const n = 128, c = document.createElement("canvas"); c.width = c.height = n;
+    const g = c.getContext("2d"), m = n / 2;
+    const rg = g.createRadialGradient(m, m, 0, m, m, m * 0.42);
+    rg.addColorStop(0, "rgba(255,255,255,1)"); rg.addColorStop(0.25, "rgba(255,246,236,.75)"); rg.addColorStop(1, "rgba(255,230,215,0)");
+    g.fillStyle = rg; g.fillRect(0, 0, n, n);
+    [[0, 1], [1, 0]].forEach(([dx, dy]) => {                  // thin rays up/down and left/right
+      const lg = g.createLinearGradient(m - dx * m, m - dy * m, m + dx * m, m + dy * m);
+      lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, "rgba(255,255,255,1)"); lg.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = lg;
+      if (dx) g.fillRect(0, m - 1.6, n, 3.2); else g.fillRect(m - 1.6, 0, 3.2, n);
+    });
+    SP.star = c;
+    return c;
+  }
+  function spRun(onEnd, baseKey, lightSrc, fromKey, sparksKey) {
     spStop();
     const my = SP.token, C = ST.sparkle;
-    const base = imgByKey[baseKey], light = spLight(lightSrc), from = fromKey ? imgByKey[fromKey] : null, fill = fillSrc ? spLight(fillSrc) : null;
-    const near = nearSrc ? spLight(nearSrc) : null, far = farSrc ? spLight(farSrc) : null;
+    const base = imgByKey[baseKey], light = spLight(lightSrc), from = fromKey ? imgByKey[fromKey] : null;
+    const sparks = (sparksKey && ST.frontSparks && ST.frontSparks[sparksKey]) || null;
     const t0 = performance.now();
     const waitReady = () => {
       if (my !== SP.token) return;
-      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth && (!fill || (fill.complete && fill.naturalWidth)) && (!near || (near.complete && near.naturalWidth)) && (!far || (far.complete && far.naturalWidth)) && (!from || (from.complete && from.naturalWidth));
+      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth && (!from || (from.complete && from.naturalWidth));
       if (!ok) {
         if (performance.now() - t0 > 3000) { if (onEnd) onEnd(); return; }       // assets missing: just move on
         SP.raf = window.requestAnimationFrame(waitReady);
@@ -1367,36 +1384,23 @@
       const W = base.naturalWidth, H = base.naturalHeight;
       if (spCanvas.width !== W || spCanvas.height !== H) { spCanvas.width = W; spCanvas.height = H; }
       const mk = (k) => { if (!SP[k] || SP[k].width !== W || SP[k].height !== H) { SP[k] = document.createElement("canvas"); SP[k].width = W; SP[k].height = H; } return SP[k].getContext("2d"); };
-      const aCtx = mk("buf"), bCtx = mk("bufB");               // A: light incl. the fill-in behind/over her, B: A after the bright band
-      const rCtx = (from || fill) ? mk("buf2") : null;         // helper layer (girl ramp / masked fill-in)
+      const aCtx = mk("buf"), bCtx = mk("bufB");               // A: light after the wipe mask, B: A after the bright band
+      const rCtx = from ? mk("buf2") : null;                   // ramp layer
+      const star = spSprite();
       spLayer.classList.add("on");
       layoutPhotoScene(sceneStory);
-      const TOTAL = C.totalMs || ST.transform.totalMs;
+      const TOTAL = ST.transform.totalMs;
       const tStart = performance.now();
       Sfx.play("magic", C.sfxDelayMs != null ? C.sfxDelayMs : ST.transform.sfxDelayMs);
-      // adds the (soft, light-coloured) fill layer to buffer A through a vertical alpha ramp: ya (alpha a0) -> yb (alpha a1)
-      const addFill = (ya, yb, a0, a1, gain, img) => {
-        rCtx.globalCompositeOperation = "source-over"; rCtx.globalAlpha = 1;
-        rCtx.clearRect(0, 0, W, H);
-        rCtx.drawImage(img || fill, 0, 0, W, H);
-        const g = rCtx.createLinearGradient(0, ya, 0, yb);
-        g.addColorStop(0, `rgba(0,0,0,${a0})`); g.addColorStop(1, `rgba(0,0,0,${a1})`);
-        rCtx.globalCompositeOperation = "destination-in";
-        rCtx.fillStyle = g; rCtx.fillRect(0, 0, W, H);
-        aCtx.globalCompositeOperation = "lighter"; aCtx.globalAlpha = gain;
-        aCtx.drawImage(SP.buf2, 0, 0, W, H);
-        aCtx.globalCompositeOperation = "source-over"; aCtx.globalAlpha = 1;
-      };
       const draw = (t) => {
         const ctx = spCtx;
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
         const rq = from ? xfClamp((t - C.rampMs[0]) / (C.rampMs[1] - C.rampMs[0])) : 1;
-        let yf = 0, hf = 0;
         if (from && rq < 1) {
           // 변신: 이전 모습(from) 위로 지나가 아래→위로 서서히 짙어지며 나타남 (투명도 그라데이션이 발끝에서 머리 끝까지 올라감)
           ctx.drawImage(from, 0, 0, W, H);
           const e = 1 - Math.pow(1 - rq, 1.4);
-          yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * e); hf = H * C.rampHalf;
+          const yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * e), hf = H * C.rampHalf;
           rCtx.globalCompositeOperation = "source-over"; rCtx.globalAlpha = 1;
           rCtx.clearRect(0, 0, W, H);
           rCtx.drawImage(base, 0, 0, W, H);
@@ -1409,59 +1413,62 @@
           ctx.drawImage(base, 0, 0, W, H);
         }
         const m = t - C.startDelayMs;
-        if (m <= 0 || m >= Math.max(C.fadeMs[1], C.whiteMs[1])) return;
+        if (m <= 0 || m >= C.wipeMs[1]) return;
         const bq = xfClamp(m / C.bloomMs), bloom = 1 - (1 - bq) * (1 - bq);                    // comes up fast right from the first frame
-        const fade = 1 - xfSmooth((m - C.fadeMs[0]) / (C.fadeMs[1] - C.fadeMs[0]));           // opacity of the light layer (screen blended)
-        const front = xfSmooth((m - C.frontMs[0]) / (C.frontMs[1] - C.frontMs[0]));           // how far the light has swung over HER (body, not the face)
+        // wipe: a soft edge runs bottom → top; everything below it (light AND the glints in front of her) is rubbed out
+        const wq = xfClamp((m - C.wipeMs[0]) / (C.wipeMs[1] - C.wipeMs[0]));
+        const we = H * C.wipeEdge;
+        const yw = H * (C.wipeFrom + (C.wipeTo - C.wipeFrom) * xfSmooth(wq));
+        const wiping = wq > 0;
         let src = light;
-        if (fade > 0) {
-          const rampOn = !!(from && fill && rq < 1);
-          if (rampOn) {
-            aCtx.globalCompositeOperation = "source-over"; aCtx.globalAlpha = 1;
-            aCtx.clearRect(0, 0, W, H);
-            // while she is still see-through: the glow that hugs her outline appears only together with her (no glowing empty silhouette),
-            // and the light behind her is filled in (no girl-shaped dark patch)
-            if (near && far) { aCtx.drawImage(far, 0, 0, W, H); addFill(yf - hf, yf + hf, 0, 1, 1, near); }
-            else aCtx.drawImage(light, 0, 0, W, H);
-            addFill(yf - hf, yf + hf, 1, 0, C.rampFillGain);
-            src = SP.buf;
-          }
+        if (wiping) {
+          aCtx.globalCompositeOperation = "source-over"; aCtx.globalAlpha = 1;
+          aCtx.clearRect(0, 0, W, H);
+          aCtx.drawImage(light, 0, 0, W, H);
+          const gw = aCtx.createLinearGradient(0, yw - we, 0, yw + we);
+          gw.addColorStop(0, "rgba(0,0,0,1)"); gw.addColorStop(1, "rgba(0,0,0,0)");
+          aCtx.globalCompositeOperation = "destination-in";
+          aCtx.fillStyle = gw; aCtx.fillRect(0, 0, W, H);
+          src = SP.buf;
+        }
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = C.baseGain * bloom;
+        ctx.drawImage(src, 0, 0, W, H);
+        const q = xfClamp((m - C.bandMs[0]) / (C.bandMs[1] - C.bandMs[0]));
+        if (q > 0 && q < 1) {                                   // one brighter band that runs up the spiral
+          const yc = H * (C.bandFrom + (C.bandTo - C.bandFrom) * xfSmooth(q)), half = H * C.bandHalf;
+          bCtx.globalCompositeOperation = "source-over"; bCtx.globalAlpha = 1;
+          bCtx.clearRect(0, 0, W, H);
+          bCtx.drawImage(src, 0, 0, W, H);
+          const gr = bCtx.createLinearGradient(0, yc - half, 0, yc + half);
+          gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+          bCtx.globalCompositeOperation = "destination-in";
+          bCtx.fillStyle = gr; bCtx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = C.bandGain * Math.sin(Math.PI * q);
+          ctx.drawImage(SP.bufB, 0, 0, W, H);
+        }
+        if (wiping) {                                           // a thin bright glow rides on the wiping edge, like the sparkle being rubbed away
+          const gl = H * C.glowHalf, gg = ctx.createLinearGradient(0, yw - gl, 0, yw + gl);
+          gg.addColorStop(0, "rgba(255,238,246,0)"); gg.addColorStop(0.5, "rgba(255,238,246,1)"); gg.addColorStop(1, "rgba(255,238,246,0)");
+          ctx.globalAlpha = C.glowGain * Math.sin(Math.PI * wq);
+          ctx.fillStyle = gg; ctx.fillRect(0, yw - gl, W, gl * 2);
+        }
+        if (sparks) {                                           // glints in front of her (face, hair, dress): twinkle in, then are wiped off with the rest
+          const GC = C.glint, size = W * GC.size;
           ctx.globalCompositeOperation = "lighter";
-          ctx.globalAlpha = C.baseGain * bloom * fade;
-          ctx.drawImage(src, 0, 0, W, H);
-          const q = xfClamp((m - C.bandMs[0]) / (C.bandMs[1] - C.bandMs[0]));
-          if (q > 0 && q < 1) {                                   // one brighter band that runs up the spiral
-            const yc = H * (C.bandFrom + (C.bandTo - C.bandFrom) * xfSmooth(q)), half = H * C.bandHalf;
-            bCtx.globalCompositeOperation = "source-over"; bCtx.globalAlpha = 1;
-            bCtx.clearRect(0, 0, W, H);
-            bCtx.drawImage(src, 0, 0, W, H);
-            const gr = bCtx.createLinearGradient(0, yc - half, 0, yc + half);
-            gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.5, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)");
-            bCtx.globalCompositeOperation = "destination-in";
-            bCtx.fillStyle = gr; bCtx.fillRect(0, 0, W, H);
-            ctx.globalAlpha = C.bandGain * fade * Math.sin(Math.PI * q);
-            ctx.drawImage(SP.bufB, 0, 0, W, H);
+          for (let i = 0; i < sparks.length; i++) {
+            const sp = sparks[i], gy = sp[1] * H, gx = sp[0] * W;
+            const born = GC.inMs[0] + sp[3] * (GC.inMs[1] - GC.inMs[0]);
+            const age = m - born;
+            if (age <= 0) continue;
+            let a = xfSmooth(age / GC.growMs) * (GC.twinkle0 + (1 - GC.twinkle0) * (0.5 + 0.5 * Math.sin(m * GC.twinkleSpeed + sp[3] * 25)));
+            const w = xfClamp((yw - gy) / (2 * we) + 0.5);        // 1 above the wiping edge, 0 below it
+            a *= w;
+            if (a < 0.01) continue;
+            const sz = size * sp[2] * (0.55 + 0.45 * xfSmooth(age / GC.growMs)) * (0.6 + 0.4 * w);
+            ctx.globalAlpha = Math.min(1, a * GC.gain);
+            ctx.drawImage(star, gx - sz, gy - sz, sz * 2, sz * 2);
           }
-        }
-        // while the light fades it overlaps HER: the soft haze behind her is screened over her body (never over the face), then dissolves with the rest
-        if (fill && front > 0 && fade > 0 && headTop != null) {
-          rCtx.globalCompositeOperation = "source-over"; rCtx.globalAlpha = 1;
-          rCtx.clearRect(0, 0, W, H);
-          rCtx.drawImage(fill, 0, 0, W, H);
-          const gh = rCtx.createLinearGradient(0, H * (headTop + C.headFadeFrom), 0, H * (headTop + C.headFadeTo));
-          gh.addColorStop(0, "rgba(0,0,0,0)"); gh.addColorStop(1, "rgba(0,0,0,1)");
-          rCtx.globalCompositeOperation = "destination-in";
-          rCtx.fillStyle = gh; rCtx.fillRect(0, 0, W, H);
-          ctx.globalCompositeOperation = "screen";
-          ctx.globalAlpha = Math.min(1, front * C.frontGain * fade);
-          ctx.drawImage(SP.buf2, 0, 0, W, H);
-        }
-        // the whole frame breathes through white for ~0.5 s while the sparkle melts away
-        const wu = xfClamp((m - C.whiteMs[0]) / (C.whiteMs[1] - C.whiteMs[0]));
-        if (wu > 0 && wu < 1) {
-          ctx.globalCompositeOperation = "source-over";
-          ctx.globalAlpha = C.whitePeak * Math.sin(Math.PI * wu);
-          ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
         }
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
       };
@@ -1505,7 +1512,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=39";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=36";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
@@ -1603,7 +1610,7 @@
       storyLater(() => glossRun(() => { glossDone = true; tryFinish(); }), instant ? 0 : TY.afterFadeMs);
     }
     if (live && cfg.kind === "transform") {
-      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.light ? cfg.from : cfg.tint, cfg.headTop, cfg.fill, cfg.lightNear, cfg.lightFar), fxDelayMs != null ? fxDelayMs : 0);
+      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.light ? cfg.from : cfg.tint, cfg.sparks), fxDelayMs != null ? fxDelayMs : 0);
     }
     if (cfg.text) {
       if (settled) typerShow(cfg.text, { instant: true, onDone: done });
