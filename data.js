@@ -104,7 +104,7 @@ window.GAME_DATA = {
     images: [
       "nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
       "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10",
-      "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15c", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
+      "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
       "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10",   // 선셋 허니 루트 (와이드)
       "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16",                         // 선셋 11~16 (드레스룸, 와이드)
       "sw-19", "sw-19c", "sw-20", "sw-22", "sw-23", "sw-24",                             // 선셋 18~24 (와이드)
@@ -112,7 +112,7 @@ window.GAME_DATA = {
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
     wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
-                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15c", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
+                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
                                                  "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16", "sw-19", "sw-19c", "sw-20", "sw-22", "sw-23", "sw-24"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
@@ -225,7 +225,7 @@ window.GAME_DATA = {
       // 13: 스크런치(왼쪽)를 먼저 고르는 화면 — 오른쪽 파우치 카드는 아직 안 눌림.  왼쪽 카드를 누르면 → 14 (스크런치 포즈로 변신)
       p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", cardSet: "B", cards: { L: { go: "p14" } } },
       // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
-      p14: { route: "party", kind: "transform", frames: ["bl-15c"], char: "assets/fx/w4-char14.webp?v=45", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p15" },
+      p14: { route: "party", kind: "transform", frames: ["bl-15d"], char: "assets/fx/w4-char14b.webp?v=50", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p15" },
       p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
       p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", cardSet: "B", cards: { R: { go: "p18" } } },
