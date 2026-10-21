@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>지나의 파티 준비</title>
+<meta name="description" content="지나를 파티에 보내는 아이템 입히기 게임 프로토타입" />
+<link rel="stylesheet" href="styles.css?v=45" />
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- Persistent top-left control bar: back / mute / undo-this-screen -->
+    <div class="control-bar hidden" id="controlBar">
+      <button class="ctrl-btn" id="btnBack" aria-label="뒤로 가기" title="뒤로 가기">
+        <span class="ctrl-glyph">←</span>
+      </button>
+      <button class="ctrl-btn" id="btnMute" aria-label="음악 끄기" title="음악 끄기/켜기">
+        <span class="ctrl-glyph" id="muteGlyph">♪</span>
+      </button>
+      <button class="ctrl-btn" id="btnUndo" aria-label="되돌리기" title="이 화면 되돌리기">
+        <span class="ctrl-glyph">↺</span>
+      </button>
+    </div>
+
+    <!-- ============ SCENE 1: 첫 화면 인트로 (봉투가 날아와 열리고, 편지지가 올라오는 캔버스 모션) ============ -->
+    <!-- 새틴 커튼 배경은 <img> (다른 사진 화면과 같은 contain-fit 계산), 그 위 캔버스에 봉투/편지지(intro.js).
+         '초대장 받기' 버튼(data-rect="introInvite")은 편지지가 멈추면 같은 자리에서 활성화되고, 누르면 너드 지나 1 로 이어집니다. -->
+    <section class="scene photo-scene" id="scene-envelope" data-scene="envelope">
+      <img class="scene-bg" id="introBg" src="assets/intro/curtain.webp?v=30" alt="" data-natural-w="402" data-natural-h="874" draggable="false" />
+      <div class="letter-layer" id="introLayer" data-rect="storyFull">
+        <canvas class="letter-canvas" id="introCanvas" width="804" height="1748"></canvas>
+      </div>
+      <div class="hotspot-layer">
+        <button class="intro-invite-btn" id="btnInvite" data-rect="introInvite" aria-label="초대장 받기"><img src="assets/intro/btn-invite.webp?v=30" alt="초대장 받기" draggable="false" /></button>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 2: 지나 스토리 (너드 지나 → 블라썸 던 루트) ============ -->
+    <!-- The composite images (402x874 art, shipped at 1206x2622 for 3x phones) are
+         created by script.js (see D.story.images) and stacked in here; it cross-fades
+         between them. Each image already has the three top-left icons baked in, so
+         invisible buttons sit on top of them. The baked music icon is drawn in its
+         "off" (slashed) state, so a small patch image (.mute-patch) hides the slash
+         while music is playing. -->
+    <section class="scene hidden photo-scene" id="scene-story" data-scene="story">
+      <!-- hair shine (blossom 9): a bright band travelling down the hair, drawn on a canvas through a hair-shaped mask (no CSS mask, so it also works when opened from a local file) -->
+      <div class="gloss-layer" id="glossLayer" data-rect="storyFull">
+        <canvas class="gloss-canvas" id="glossCanvas" width="804" height="1748"></canvas>
+      </div>
+      <!-- 블썸 11: sparkle spiral behind Jina (behind-transform test v7), drawn on a canvas -->
+      <div class="xf-layer" id="xfLayer" data-rect="storyFull">
+        <canvas class="xf-canvas" id="xfCanvas" width="804" height="1748"></canvas>
+      </div>
+      <!-- 블썸 11 (와이드 그림): designer's sparkle light layer, drawn on a canvas that covers the whole wide picture -->
+      <div class="sp-layer" id="spLayer" data-rect="storyWide">
+        <canvas class="sp-canvas" id="spCanvas" width="1040" height="1748"></canvas>
+      </div>
+      <!-- petals, 빠직 marks and the pressed-card patches (sprites from assets/fx) -->
+      <div class="story-fx" id="storyFx" data-rect="storyFull"></div>
+      <canvas class="type-canvas" id="typeCanvas" data-rect="typeText"></canvas>
+      <img class="arrow-mark" id="arrowMark" data-rect="typeArrow" alt="" draggable="false" />
+      <img class="mute-patch" id="mutePatch" data-rect="storyMutePatch" src="assets/scenes/mute-on-patch.png" alt="" draggable="false" />
+      <div class="hotspot-layer" id="storyHotspots">
+        <!-- tap anywhere to continue (only active on the dialogue screens) -->
+        <button class="hotspot story-tap" id="storyTap" data-rect="storyFull" aria-label="다음"></button>
+        <button class="hotspot story-card" id="cardL" data-rect="storyCardL" aria-label="왼쪽 아이템 선택"></button>
+        <button class="hotspot story-card" id="cardR" data-rect="storyCardR" aria-label="오른쪽 아이템 선택"></button>
+        <button class="hotspot" id="storyBack" data-rect="storyBack" aria-label="뒤로 가기"></button>
+        <button class="hotspot" id="storyMute" data-rect="storyMute" aria-label="음악 끄기"></button>
+        <button class="hotspot" id="storyUndo" data-rect="storyUndo" aria-label="처음부터 다시"></button>
+      </div>
+      <!-- curtain that opens onto the party hall (curtain-open test): two halves gather to the sides -->
+      <div class="curtain-layer" id="curtainLayer" aria-hidden="true">
+        <div class="curtain-half" id="curtainL"><img src="assets/scenes/bl-curtain.webp?v=45" alt="" draggable="false" /></div>
+        <div class="curtain-half" id="curtainR"><img src="assets/scenes/bl-curtain.webp?v=45" alt="" draggable="false" /></div>
+      </div>
+    </section>
+
+    <!-- ============ SCENE 3b: 편지 화면 (블라썸 24 → ▶). 배경 이미지(위쪽 아이콘 포함) 위 캔버스에 봉투/편지지 모션, 그 위에 선물받기/다시하기 버튼 ============ -->
+    <section class="scene hidden photo-scene" id="scene-letter" data-scene="letter">
+      <img class="scene-bg" id="letterBg" src="assets/scenes/letter-sat.webp?v=45" alt="" data-natural-w="402" data-natural-h="874" data-cover="1" draggable="false" />
+      <img class="letter-icons" id="letterIcons" data-rect="letterIcons" src="assets/scenes/letter-icons2.webp?v=45" alt="" draggable="false" />
+      <div class="letter-layer" id="letterLayer" data-rect="letterLayer">
+        <canvas class="letter-canvas" id="letterCanvas" width="804" height="1748"></canvas>
+      </div>
+      <img class="mute-patch" id="letterMutePatch" data-rect="storyMutePatch" src="assets/scenes/mute-on-patch-pink2.png?v=31" alt="" draggable="false" />
+      <div class="hotspot-layer">
+        <button class="hotspot" id="letterBack" data-rect="storyBack" aria-label="뒤로 가기"></button>
+        <button class="hotspot" id="letterMute" data-rect="storyMute" aria-label="음악 끄기"></button>
+        <button class="hotspot" id="letterUndo" data-rect="storyUndo" aria-label="처음부터 다시"></button>
+      </div>
+      <button class="letter-pill" id="letterGift" data-rect="letterGift" aria-label="선물받기"><img src="assets/letter/btn-gift.webp?v=30" alt="선물받기" draggable="false" /></button>
+      <button class="letter-pill" id="letterRetry" data-rect="letterRetry" aria-label="다시하기"><img src="assets/letter/btn-retry.webp?v=30" alt="다시하기" draggable="false" /></button>
+    </section>
+
+    <!-- ============ SCENE 4: styling-tool puzzle (comb vs curler, photo scene) ============ -->
+    <section class="scene hidden photo-scene" id="scene-style" data-scene="style">
+      <img class="scene-bg" id="styleImg" alt="스타일링 도구를 골라주세요" data-natural-w="402" data-natural-h="874" />
+      <div class="fx-layer" id="styleFxLayer"></div>
+      <div class="hotspot-layer" id="styleHotspots">
+        <button class="hotspot" data-rect="ctrlBack" aria-label="뒤로 가기"></button>
+        <button class="hotspot" data-rect="ctrlMute" aria-label="음악 끄기"></button>
+        <button class="hotspot" data-rect="ctrlUndo" aria-label="되돌리기"></button>
+        <button class="hotspot" data-rect="cardLeft" id="styleCorrectBtn" aria-label="고데기 선택"></button>
+        <button class="hotspot" data-rect="cardRight" id="styleWrongBtn" aria-label="꼬리빗 선택"></button>
+      </div>
+      <button class="next-arrow hidden" id="styleNextBtn" aria-label="다음">→</button>
+    </section>
+
+    <!-- ============ SCENE 5: accessory collection — awaiting real art ============ -->
+    <section class="scene hidden" id="scene-accessory" data-scene="accessory">
+      <div class="stage-bg" id="accessoryBg"></div>
+      <p class="stage-prompt" id="accessoryPlaceholderLabel"></p>
+      <div class="speech-bubble" id="accessoryBubble"><p id="accessoryBubbleText"></p></div>
+      <div class="item-row" id="accessoryButtons"></div>
+      <button class="next-arrow hidden" id="accessoryNextBtn" aria-label="다음">→</button>
+    </section>
+
+    <!-- ============ SCENE 6: curtain reveal ============ -->
+    <section class="scene hidden" id="scene-curtain" data-scene="curtain">
+      <div class="stage-bg" id="curtainBg"></div>
+      <div class="curtain-panel left"></div>
+      <div class="curtain-panel right"></div>
+    </section>
+
+    <!-- ============ SCENE 7: ending + retry — awaiting real art ============ -->
+    <section class="scene hidden" id="scene-ending" data-scene="ending">
+      <div class="stage-bg" id="endingBg"></div>
+      <div class="speech-bubble" id="endingBubble"><p id="endingBubbleText"></p></div>
+      <button class="retry-btn hidden" id="btnRetry"></button>
+    </section>
+
+    <!-- Shared bottom toast, reused by any photo scene for a short message -->
+    <div class="global-toast" id="globalToast"><p id="globalToastText"></p></div>
+
+    <!-- Shared transition overlay (black -> white fade used between stages) -->
+    <div class="transition-overlay" id="transitionOverlay"></div>
+
+    <!-- Shared timed gif/mp4 overlay: appears, autoplays, disappears after -->
+    <div class="timed-media-overlay hidden" id="timedMediaOverlay">
+      <video id="timedVideo" class="hidden" muted playsinline></video>
+      <img id="timedGif" class="hidden" alt="" />
+    </div>
+
+  </div>
+
+
+  <script src="data.js?v=47"></script>
+  <script src="assets/text/dialogue-map.js?v=46"></script>
+  <script src="assets/fx/fx-map.js?v=45"></script>
+  <script src="assets/fx/fx-map-sun.js?v=46"></script>
+  <script src="letter.js?v=45"></script>
+  <script src="intro.js?v=34"></script>
+  <script src="script.js?v=47"></script>
+</body>
+</html>
