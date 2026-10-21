@@ -1112,14 +1112,14 @@
     const T = (x, y, sc, r) => `translate(${x}%,${y}%) scale(${sc}) rotate(${r}deg)`;
     const k = [
       { x: dx, y: dy, sc: P.startScale, r: P.startRot, o: 0, so: 0, off: 0 },
-      { x: dx * 0.93, y: dy * 0.93, sc: P.startScale * 1.03, r: P.startRot * 0.9, o: 1, so: 0.34, off: 0.1 },
+      { x: dx * 0.93, y: dy * 0.93, sc: P.startScale * 1.03, r: P.startRot * 0.9, o: 1, so: 0.16, off: 0.1 },
       { x: -1.5, y: -1, sc: Z, r: -3, o: 1, so: 0.1, off: sk },
       { x: 0.4, y: 0.3, sc: 1.035, r: 0.8, o: 1, so: 0.05, off: sk + (1 - sk) * 0.5 },
       { x: 0, y: 0, sc: 1, r: 0, o: 1, so: 0, off: 1 },
     ];
     const frames = (shadowPass) => k.map((f, i) => ({
       transform: shadowPass ? T(f.x + 1, f.y + 2 + f.so * 30, f.sc, f.r) : T(f.x, f.y, f.sc, f.r),
-      opacity: shadowPass ? f.so * f.o : f.o,
+      ...(shadowPass ? { opacity: f.so * f.o } : {}),                 // 카드의 투명도는 아래에서 따로 (천천히 선명해지게)
       offset: f.off, easing: i === 0 ? "ease-out" : i === 1 ? ease : i === 2 ? "ease-in-out" : "ease-out",
     }));
     if (P.mode === "emerge") {
@@ -1151,11 +1151,13 @@
       return;
     }
     const a1 = card.animate(frames(false), { duration: P.durMs, fill: "both" });
+    // 처음엔 투명하게 떠올랐다가 날아오는 동안 서서히 선명해진다 (갑자기 나타나 보이지 않게)
+    const a4 = card.animate([{ opacity: 0, offset: 0, easing: "ease-in" }, { opacity: 0.55, offset: P.fadeAt1 || 0.16, easing: "ease-out" }, { opacity: 1, offset: P.fadeAt2 || 0.34 }, { opacity: 1, offset: 1 }], { duration: P.durMs, fill: "both" });
     const a3 = shadow ? shadow.animate(frames(true), { duration: P.durMs, fill: "both" }) : null;
     const a2 = girl.animate([
       { opacity: 0, offset: 0 }, { opacity: 0, offset: P.frontOffAt }, { opacity: 1, offset: P.frontOnAt }, { opacity: 1, offset: 1 },
     ], { duration: P.durMs, fill: "both" });
-    story.pcard.push(a1, a2); if (a3) story.pcard.push(a3);
+    story.pcard.push(a1, a2, a4); if (a3) story.pcard.push(a3);
     if (P.sfx) Sfx.play(P.sfx, P.sfxDelayMs || 0);
     };
     o.ready.then(() => { if (o.wrap.isConnected) run(); });
