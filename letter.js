@@ -14,7 +14,7 @@
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",
     letter: "letter.webp",
   };
-  const VER = "?v=37";
+  const VER = "?v=39";
   // 테마별 값: 봉투 사진마다 힌지(뚜껑 접히는 선)·모서리 위치와 크기가 달라서, 화면에서 보이는 크기/기울기가 같도록 K·ROT 를 맞춰 둠
   //  K = 레이어 이미지 배율, TL/TR = 힌지 양 끝, BR/BL = 아래쪽 모서리 (닫힌 봉투 사진 기준 px), shade = 열린 봉투 안쪽 색
   const THEMES = {
@@ -131,7 +131,7 @@
     };
   }
   // whole group (envelope + letter): scaled about GP and lifted by GY so it fills the screen above the two buttons
-  const GS = 1.17, GP = { x: 201, y: 110 }, GY = -27;
+  const GS = 1.17, GP = { x: 201, y: 110 }, GY = -62;
   function flightTransform(p) {
     ctx.translate(0, GY * S); ctx.translate(GP.x * S, GP.y * S); ctx.scale(GS, GS); ctx.translate(-GP.x * S, -GP.y * S);
     ctx.translate((PIV.x + p.x) * S, (PIV.y + p.y) * S);
