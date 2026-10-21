@@ -107,13 +107,13 @@ window.GAME_DATA = {
       "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15c", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
       "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10",   // 선셋 허니 루트 (와이드)
       "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16",                         // 선셋 11~16 (드레스룸, 와이드)
-      "sn-12", "sn-18c", "sn-19", "sn-20", "sn-21", "sn-22", "sn-23", "sn-24",         // 선셋 18~24 (아직 예전 그림: 새 그림이 오면 와이드로 교체)
+      "sw-19", "sw-19c", "sw-20", "sw-22", "sw-23", "sw-24",                             // 선셋 18~24 (와이드)
     ],
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
     wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
                                                  "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15c", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
-                                                 "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16"] },
+                                                 "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16", "sw-19", "sw-19c", "sw-20", "sw-22", "sw-23", "sw-24"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
       // nerd: 넓은 그림(와이드 캔버스)을 쓰는 루트. rects = 이 루트에서만 쓰는 버튼/카드 위치 (402x874 기준 0~1 비율; 위의 HOTSPOT_RECTS 를 덮어씀)
@@ -129,8 +129,7 @@ window.GAME_DATA = {
       party:   { prefix: "bl",   fill: "bl-13",  wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },   // 블썸 12~20 (드레스룸, 와이드)
       sunset:  { prefix: "sw",   fill: "sw-3",   wide: true, mute: "assets/scenes/mute-on-patch-gold2.png?v=46", rects: null },   // 선셋 허니 루트 (와이드)
       sparty:  { prefix: "sw",   fill: "sw-13",  wide: true, mute: "assets/scenes/mute-on-patch-gold2.png?v=46", rects: null },   // 선셋 11~16 (드레스룸, 와이드)
-      sparty0: { prefix: "sn",   fill: "sn-12",     mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 18~20 (예전 그림, 새 그림이 오면 sparty 로 합칠 예정)
-      shall:   { prefix: "sn",   fill: "sn-22",     mute: "assets/scenes/mute-on-patch-gold.png" },     // 선셋 22~24 (파티장)
+      shall:   { prefix: "sw",   fill: "sw-22",  wide: true, mute: "assets/scenes/mute-on-patch-gold2.png?v=46", rects: null },   // 선셋 22~24 (파티장, 와이드)
       hall:    { prefix: "bl",   fill: "bl-22",  wide: true, mute: "assets/scenes/mute-on-patch-pink2.png?v=31", rects: null },   // 블썸 22~24 (파티장, 와이드)
     },
     // 블썸 11: "지나 뒤 변신 효과" (behind-transform test v7). 자막 없이 반짝임 소용돌이가 지나 뒤→앞으로 훑고 사라지면 자동으로 다음 화면.
@@ -194,13 +193,13 @@ window.GAME_DATA = {
       sp14: { route: "sparty", kind: "transform", frames: ["sw-15c"], plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char14.webp?v=46", spiral: { cx: 0.487, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp15" },
       sp15: { route: "sparty", kind: "dialogue", frames: ["sw-15"], text: "XK", arrow: "X", next: "sp16" },
       sp16: { route: "sparty", kind: "choice", frames: ["sw-16"], text: "XL", arrow: "X", cardSet: "S2", cards: { R: { go: "sp18" } } },
-      sp18: { route: "sparty0", kind: "transform", frames: ["sn-18c"], char: "assets/fx/sn-char18.png", tint: "gold", veil: "fast", transient: true, next: "sp19" },
-      sp19: { route: "sparty0", kind: "dialogue", frames: ["sn-19"], text: "SM", arrow: "SAK", next: "sp20" },
-      sp20: { route: "sparty0", kind: "dialogue", frames: ["sn-20"], text: "SN", arrow: "SAK", next: "sh22" },
-      sh22: { route: "shall", kind: "dialogue", frames: ["sn-22"], curtain: true, text: "SO", arrow: "SAZ", next: "sh23" },
-      sh23: { route: "shall", kind: "dialogue", frames: ["sn-23"], text: "SP", arrow: "SAZ", next: "sh24" },
+      sp18: { route: "sparty", kind: "transform", frames: ["sw-19c"], tint: "gold", char: "assets/fx/sw-char18.webp?v=48", spiral: { cx: 0.4916, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp19" },
+      sp19: { route: "sparty", kind: "dialogue", frames: ["sw-19"], text: "XM", arrow: "X", next: "sp20" },
+      sp20: { route: "sparty", kind: "dialogue", frames: ["sw-20"], text: "XN", arrow: "X", next: "sh22" },
+      sh22: { route: "shall", kind: "dialogue", frames: ["sw-22"], curtain: true, text: "XO", arrow: "XZ", next: "sh23" },
+      sh23: { route: "shall", kind: "dialogue", frames: ["sw-23"], text: "XP", arrow: "XZ", next: "sh24" },
       // 24: ▶ → 흰 페이드로 편지 화면(letter.js, 금색 테마)
-      sh24: { route: "shall", kind: "dialogue", frames: ["sn-24"], text: "SQ", arrow: "SAZ", next: null, toLetter: true },
+      sh24: { route: "shall", kind: "dialogue", frames: ["sw-24"], text: "XQ", arrow: "XZ", next: null, toLetter: true },
 
       // ---- 블라썸 지나 ----
       bl1: { route: "blossom", kind: "dialogue", frames: ["bl-1"], text: "WD", arrow: "W", fx: "petals", next: "bl2" },
@@ -306,4 +305,4 @@ window.GAME_DATA = {
 };
 
 // 블썸(와이드) 루트들은 너드 루트와 같은 버튼/카드 템플릿 → 같은 클릭 영역
-(function () { const R = window.GAME_DATA.story.routes; R.blossom.rects = R.party.rects = R.hall.rects = R.sunset.rects = R.sparty.rects = R.nerd.rects; })();
+(function () { const R = window.GAME_DATA.story.routes; R.blossom.rects = R.party.rects = R.hall.rects = R.sunset.rects = R.sparty.rects = R.shall.rects = R.nerd.rects; })();

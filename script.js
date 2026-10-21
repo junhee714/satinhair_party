@@ -673,7 +673,7 @@
   const FX = window.FX_MAP || { petals: [], marks: {}, cards: {} };
   const FX_SUN = window.FX_MAP_SUN || { petals: [], marks: {}, cards: {} };
   // petals / marks / card patches / hair mask are cut from the pictures of each route
-  const SUN_ROUTES = new Set(["sunset", "sparty", "sparty0", "shall"]);
+  const SUN_ROUTES = new Set(["sunset", "sparty", "shall"]);
   const fxFor = (route) => (SUN_ROUTES.has(route) ? FX_SUN : FX);
 
   sceneStory.style.setProperty("--story-fade", `${ST.fadeMs}ms`);
@@ -708,7 +708,7 @@
   warmed.nerd = true;
   // After the page has settled, fetch both routes' pictures in the background (instead of waiting for the choice screen),
   // so no screen has to be downloaded while the player is tapping through.
-  function warmAllRoutes() { ["blossom", "sunset", "sparty0"].forEach((r, i) => window.setTimeout(() => warmRoute(r), i * 1500)); }
+  function warmAllRoutes() { ["blossom", "sunset", "sparty"].forEach((r, i) => window.setTimeout(() => warmRoute(r), i * 1500)); }
   (function () {
     const go = () => window.setTimeout(warmAllRoutes, 2500);
     if (document.readyState === "complete") go(); else window.addEventListener("load", go, { once: true });
@@ -1537,7 +1537,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=45";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sw-curtain.webp?v=47" : "assets/scenes/bl-curtain.webp?v=45";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
