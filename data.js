@@ -109,13 +109,13 @@ window.GAME_DATA = {
       "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
       "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10",   // 선셋 허니 루트 (와이드)
       "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16",                         // 선셋 11~16 (드레스룸, 와이드)
-      "sw-19", "sw-19c", "sw-20", "sw-22", "sw-23", "sw-24",                             // 선셋 18~24 (와이드)
+      "sw-19n", "sw-19cn", "sw-20", "sw-22", "sw-23", "sw-24",                             // 선셋 18~24 (와이드)
     ],
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
     wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
                                                  "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
-                                                 "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16", "sw-19", "sw-19c", "sw-20", "sw-22", "sw-23", "sw-24"] },
+                                                 "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15", "sw-15c", "sw-16", "sw-19n", "sw-19cn", "sw-20", "sw-22", "sw-23", "sw-24"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
       // nerd: 넓은 그림(와이드 캔버스)을 쓰는 루트. rects = 이 루트에서만 쓰는 버튼/카드 위치 (402x874 기준 0~1 비율; 위의 HOTSPOT_RECTS 를 덮어씀)
@@ -151,6 +151,11 @@ window.GAME_DATA = {
       // 블썸 21 (파우치 자막)
       p19: { src: "assets/fx/bl-pouchcard19.webp?v=54", rect: { x: 0.45374, y: 0.24628, w: 0.69303, h: 0.34786 },
              char: "assets/fx/w4-char18.webp?v=45", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
+      // 선셋 17 (스크런치 자막) / 선셋 21 (파우치 자막)
+      sp15: { src: "assets/fx/sw-pouchcard17.webp?v=55", rect: { x: -0.14677, y: 0.14332, w: 0.70974, h: 0.33551 },
+              char: "assets/fx/sw-char14.webp?v=46", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
+      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.43583, y: 0.21965, w: 0.71094, h: 0.36681 },
+              char: "assets/fx/sw-char18b.webp?v=55", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
     },
     pouchCard: { charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
                  delayMs: 60, durMs: 1000, textAfterMs: 760, startScale: 1.7,
@@ -208,10 +213,10 @@ window.GAME_DATA = {
       sp11: { route: "sparty", kind: "transform", frames: ["sw-12"], from: "sw-12bg", plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char12.webp?v=46", spiral: { cx: 0.498, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp13" },
       sp13: { route: "sparty", kind: "choice", frames: ["sw-13"], text: "XJ", arrow: "X", cardSet: "S2", cards: { L: { go: "sp14" } } },
       sp14: { route: "sparty", kind: "transform", frames: ["sw-15c"], plate: "sw-12bg", tint: "gold", char: "assets/fx/sw-char14.webp?v=46", spiral: { cx: 0.487, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp15" },
-      sp15: { route: "sparty", kind: "dialogue", frames: ["sw-15"], text: "XK", arrow: "X", next: "sp16" },
+      sp15: { route: "sparty", kind: "dialogue", frames: ["sw-15"], text: "XK", arrow: "X", fx: "pouchcard", pouch: "sp15", next: "sp16" },
       sp16: { route: "sparty", kind: "choice", frames: ["sw-16"], text: "XL", arrow: "X", cardSet: "S2", cards: { R: { go: "sp18" } } },
-      sp18: { route: "sparty", kind: "transform", frames: ["sw-19c"], tint: "gold", char: "assets/fx/sw-char18.webp?v=48", spiral: { cx: 0.4916, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp19" },
-      sp19: { route: "sparty", kind: "dialogue", frames: ["sw-19"], text: "XM", arrow: "X", next: "sp20" },
+      sp18: { route: "sparty", kind: "transform", frames: ["sw-19cn"], tint: "gold", char: "assets/fx/sw-char18b.webp?v=55", spiral: { cx: 0.4744, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "sp19" },
+      sp19: { route: "sparty", kind: "dialogue", frames: ["sw-19n"], text: "XM", arrow: "X", fx: "pouchcard", pouch: "sp19", next: "sp20" },
       sp20: { route: "sparty", kind: "dialogue", frames: ["sw-20"], text: "XN", arrow: "X", next: "sh22" },
       sh22: { route: "shall", kind: "dialogue", frames: ["sw-22"], curtain: true, text: "XO", arrow: "XZ", next: "sh23" },
       sh23: { route: "shall", kind: "dialogue", frames: ["sw-23"], text: "XP", arrow: "XZ", next: "sh24" },
