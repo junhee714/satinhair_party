@@ -26,6 +26,7 @@
   const LET0 = 3050, LET = 1900;              // letter is pulled up out of the envelope
   const DROP0 = 3250, DROP = 1750;            // envelope sinks to the bottom while the letter rises
   const TOTAL = 5100;
+  const WIND2 = (window.GAME_DATA && window.GAME_DATA.introWindLetterMs) || 2700;   // 2nd wind sound: starts as the flap finishes opening, peaks while the letter is pulled out (ms after the intro starts)
   const START_X = -350, START_Y = -240, START_ROT = 24 * Math.PI / 180, START_SCALE = 1.14;   // like the mp4: enters from the left edge, tilted clockwise, flap pointing down-right
 
   // ---- envelope layers are pre-scaled by K (frame px -> canvas px); frame = the frontal open envelope photo (1143x1080)
@@ -42,6 +43,7 @@
   const LW = 356, LET_X = (402 - LW) / 2, LET_TOP = 174, LET_PEEK = 14, PAD = 2;
   // button on the letter (design px, relative to the letter's top): 162.6 x 41.8, under the "입장 조건" box
   const BW = 138.2, BH = 35.6, BTN_DY = 345.3;
+  const BS = 1.2;                                       // the button is drawn / shown 1.2x bigger about its centre (keep in sync with HOTSPOT_RECTS.introInvite)
   const BTN_IMG_W = 770 / 5.1955, BTN_IMG_H = 237 / 5.1955, BTN_PAD = 26 / 5.1955;   // button image carries its own soft shadow (baked in), so the canvas copy and the real button are pixel-identical
   let btnLive = false;                                  // true once the real <button> has taken over from the canvas copy        // centre of the blank margin under the 입장 조건 box (box bottom y457 .. ornaments y552 -> centre 507)
 
@@ -149,7 +151,7 @@
         const ba = smooth01((lp - 0.3) / 0.5);
         if (ba > 0) {
           ctx.globalAlpha = alpha * ba;
-          ctx.drawImage(img.btn, (LET_X + LW / 2 - BW / 2 - BTN_PAD) * S, (top + BTN_DY - BTN_PAD) * S, BTN_IMG_W * S, BTN_IMG_H * S);
+          ctx.drawImage(img.btn, (LET_X + LW / 2 - (BW / 2 + BTN_PAD) * BS) * S, (top + BTN_DY + BH / 2 - (BH / 2 + BTN_PAD) * BS) * S, BTN_IMG_W * BS * S, BTN_IMG_H * BS * S);
         }
       }
       ctx.restore();
@@ -235,10 +237,11 @@
       if (!img.open_panels) { ctx.clearRect(0, 0, CW, CH); showButton(true); return; }   // art failed to load: never block the game
       const t0 = performance.now();
       if (api.onStart) api.onStart();                      // (the game plays the wind sound here)
-      let shown = false;
+      let shown = false, wind2 = false;
       const tick = (now) => {
         if (my !== token) return;
         const t = now - t0;
+        if (!wind2 && t >= WIND2) { wind2 = true; if (api.onLetter) api.onLetter(); }   // (the game plays the second wind sound here)
         if (!shown && t >= LET0 + LET) { shown = true; showButton(false); }           // letter stopped: the real button takes over in the same frame (same spot, same pixels)
         draw(Math.min(t, TOTAL));
         if (t < TOTAL) raf = requestAnimationFrame(tick); else raf = 0;
@@ -272,7 +275,7 @@
       if (img.open_panels && lastT >= 0 && !raf) draw(lastT);
     }
   }
-  const api = { play, showEnd, stop, preload, layout, onStart: null };
+  const api = { play, showEnd, stop, preload, layout, onStart: null, onLetter: null };
   window.IntroScene = api;
   preload();
 })();
