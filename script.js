@@ -686,7 +686,7 @@
 
   // ---- the stack of composite images (created here so the HTML stays small) ----
   const imgByKey = {};
-  const imgSrc = (key) => `assets/scenes/${key}.webp?v=36`;
+  const imgSrc = (key) => `assets/scenes/${key}.webp?v=37`;
   ST.images.forEach((key) => {
     const im = document.createElement("img");
     im.className = "scene-bg story-img";
@@ -1344,7 +1344,7 @@
     return SP.lights[src];
   }
   // the light layers of the sparkle screens are fetched + decoded ahead of time, so the effect never waits for them
-  window.setTimeout(() => Object.values(STEPS).forEach((c) => { if (c.light) { const im = spLight(c.light); if (im.decode) im.decode().catch(() => {}); } }), 3500);
+  window.setTimeout(() => Object.values(STEPS).forEach((c) => { if (c.light) { [c.light, c.fill].forEach((u) => { if (!u) return; const im = spLight(u); if (im.decode) im.decode().catch(() => {}); }); } }), 3500);
   function spStop() {
     SP.token++;
     window.cancelAnimationFrame(SP.raf);
@@ -1367,15 +1367,15 @@
     SP.star = c;
     return c;
   }
-  function spRun(onEnd, baseKey, lightSrc, fromKey, sparksKey) {
+  function spRun(onEnd, baseKey, lightSrc, fromKey, sparksKey, fillSrc) {
     spStop();
     const my = SP.token, C = ST.sparkle;
-    const base = imgByKey[baseKey], light = spLight(lightSrc), from = fromKey ? imgByKey[fromKey] : null;
+    const base = imgByKey[baseKey], light = spLight(lightSrc), from = fromKey ? imgByKey[fromKey] : null, fill = fillSrc ? spLight(fillSrc) : null;
     const sparks = (sparksKey && ST.frontSparks && ST.frontSparks[sparksKey]) || null;
     const t0 = performance.now();
     const waitReady = () => {
       if (my !== SP.token) return;
-      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth && (!from || (from.complete && from.naturalWidth));
+      const ok = base.complete && base.naturalWidth && light.complete && light.naturalWidth && (!fill || (fill.complete && fill.naturalWidth)) && (!from || (from.complete && from.naturalWidth));
       if (!ok) {
         if (performance.now() - t0 > 3000) { if (onEnd) onEnd(); return; }       // assets missing: just move on
         SP.raf = window.requestAnimationFrame(waitReady);
@@ -1396,11 +1396,12 @@
         const ctx = spCtx;
         ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
         const rq = from ? xfClamp((t - C.rampMs[0]) / (C.rampMs[1] - C.rampMs[0])) : 1;
+        let yf = 0, hf = 0;
         if (from && rq < 1) {
           // 변신: 이전 모습(from) 위로 지나가 아래→위로 서서히 짙어지며 나타남 (투명도 그라데이션이 발끝에서 머리 끝까지 올라감)
           ctx.drawImage(from, 0, 0, W, H);
           const e = 1 - Math.pow(1 - rq, 1.4);
-          const yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * e), hf = H * C.rampHalf;
+          yf = H * (C.rampFrom + (C.rampTo - C.rampFrom) * e); hf = H * C.rampHalf;
           rCtx.globalCompositeOperation = "source-over"; rCtx.globalAlpha = 1;
           rCtx.clearRect(0, 0, W, H);
           rCtx.drawImage(base, 0, 0, W, H);
@@ -1421,16 +1422,32 @@
         const yw = H * (C.wipeFrom + (C.wipeTo - C.wipeFrom) * xfSmooth(wq));
         const wiping = wq > 0;
         let src = light;
-        if (wiping) {
+        const rampOn = !!(from && fill && rq < 1);
+        if (wiping || rampOn) {
           aCtx.globalCompositeOperation = "source-over"; aCtx.globalAlpha = 1;
           aCtx.clearRect(0, 0, W, H);
           aCtx.drawImage(light, 0, 0, W, H);
+          if (rampOn) {
+            // where she is still see-through, the light behind her is filled in too (no girl-shaped dark patch while she fades in)
+            rCtx.globalCompositeOperation = "source-over"; rCtx.globalAlpha = 1;
+            rCtx.clearRect(0, 0, W, H);
+            rCtx.drawImage(fill, 0, 0, W, H);
+            const gf = rCtx.createLinearGradient(0, yf - hf, 0, yf + hf);
+            gf.addColorStop(0, "rgba(0,0,0,1)"); gf.addColorStop(1, "rgba(0,0,0,0)");
+            rCtx.globalCompositeOperation = "destination-in";
+            rCtx.fillStyle = gf; rCtx.fillRect(0, 0, W, H);
+            aCtx.globalCompositeOperation = "lighter";
+            aCtx.drawImage(SP.buf2, 0, 0, W, H);
+            aCtx.globalCompositeOperation = "source-over";
+          }
+        }
+        if (wiping) {
           const gw = aCtx.createLinearGradient(0, yw - we, 0, yw + we);
           gw.addColorStop(0, "rgba(0,0,0,1)"); gw.addColorStop(1, "rgba(0,0,0,0)");
           aCtx.globalCompositeOperation = "destination-in";
           aCtx.fillStyle = gw; aCtx.fillRect(0, 0, W, H);
-          src = SP.buf;
         }
+        if (wiping || rampOn) src = SP.buf;
         ctx.globalCompositeOperation = "lighter";
         ctx.globalAlpha = C.baseGain * bloom;
         ctx.drawImage(src, 0, 0, W, H);
@@ -1446,12 +1463,6 @@
           bCtx.fillStyle = gr; bCtx.fillRect(0, 0, W, H);
           ctx.globalAlpha = C.bandGain * Math.sin(Math.PI * q);
           ctx.drawImage(SP.bufB, 0, 0, W, H);
-        }
-        if (wiping) {                                           // a thin bright glow rides on the wiping edge, like the sparkle being rubbed away
-          const gl = H * C.glowHalf, gg = ctx.createLinearGradient(0, yw - gl, 0, yw + gl);
-          gg.addColorStop(0, "rgba(255,238,246,0)"); gg.addColorStop(0.5, "rgba(255,238,246,1)"); gg.addColorStop(1, "rgba(255,238,246,0)");
-          ctx.globalAlpha = C.glowGain * Math.sin(Math.PI * wq);
-          ctx.fillStyle = gg; ctx.fillRect(0, yw - gl, W, gl * 2);
         }
         if (sparks) {                                           // glints in front of her (face, hair, dress): twinkle in, then are wiped off with the rest
           const GC = C.glint, size = W * GC.size;
@@ -1512,7 +1523,7 @@
     stopSway();
     // 커튼이 활짝 열리기 시작하는 순간(닫힘 페이드 + 대기 뒤)에 소리의 하이라이트가 오도록 시작을 늦춘다
     Sfx.play("shine", Math.max(0, C.fadeInMs + 30 + C.holdMs - C.sfxPeakMs));
-    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=36";      // the closed curtain of the route
+    const curSrc = SUN_ROUTES.has(STEPS[id].route) ? "assets/scenes/sn-21.webp" : "assets/scenes/bl-curtain.webp?v=37";      // the closed curtain of the route
     curtainHalves.forEach((h) => { const im = h.querySelector("img"); if (im && !im.src.endsWith(curSrc)) im.src = curSrc; });
     layoutPhotoScene(sceneStory);
     curtainLayer.style.setProperty("--cur-in", `${C.fadeInMs}ms`);
@@ -1610,7 +1621,7 @@
       storyLater(() => glossRun(() => { glossDone = true; tryFinish(); }), instant ? 0 : TY.afterFadeMs);
     }
     if (live && cfg.kind === "transform") {
-      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.light ? cfg.from : cfg.tint, cfg.sparks), fxDelayMs != null ? fxDelayMs : 0);
+      storyLater(() => (cfg.light ? spRun : xfRun)(() => { glossDone = true; tryFinish(); }, cfg.frames[0], cfg.light || cfg.char, cfg.light ? cfg.from : cfg.tint, cfg.sparks, cfg.fill), fxDelayMs != null ? fxDelayMs : 0);
     }
     if (cfg.text) {
       if (settled) typerShow(cfg.text, { instant: true, onDone: done });

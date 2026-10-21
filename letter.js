@@ -14,7 +14,7 @@
     open_flap: "open-flap.webp", open_interior: "open-interior.webp", open_panels: "open-panels.webp",
     letter: "letter.webp",
   };
-  const VER = "?v=36";
+  const VER = "?v=37";
   // 테마별 값: 봉투 사진마다 힌지(뚜껑 접히는 선)·모서리 위치와 크기가 달라서, 화면에서 보이는 크기/기울기가 같도록 K·ROT 를 맞춰 둠
   //  K = 레이어 이미지 배율, TL/TR = 힌지 양 끝, BR/BL = 아래쪽 모서리 (닫힌 봉투 사진 기준 px), shade = 열린 봉투 안쪽 색
   const THEMES = {
@@ -71,7 +71,7 @@
   applyGeometry();
 
   // ---- letter (design px): top-left corner (26,164), tilted -4.4 deg; PAD px transparent margin in the image
-  const LET_POS = { x: 26, y: 164 }, LET_ROT = -4.4 * Math.PI / 180, LET_D = 470, PAD = 2;
+  const LET_POS = { x: 26, y: 198 }, LET_ROT = -4.4 * Math.PI / 180, LET_D = 504, PAD = 2;   // y 164→198: the paper sits lower, so more of it is covered by the envelope
 
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
   const easeOutBack = (u, s = 0.9) => { u = clamp01(u) - 1; return 1 + u * u * ((s + 1) * u + s); };
