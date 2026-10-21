@@ -154,7 +154,7 @@ window.GAME_DATA = {
       // 선셋 17 (스크런치 자막) / 선셋 21 (파우치 자막)
       sp15: { src: "assets/fx/sw-pouchcard17.webp?v=55", rect: { x: -0.14677, y: 0.14332, w: 0.70974, h: 0.33551 },
               char: "assets/fx/sw-char14.webp?v=46", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
-      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.543, y: 0.271, w: 0.512, h: 0.264 },
+      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.43583, y: 0.21965, w: 0.71094, h: 0.36681 },
               char: "assets/fx/sw-char18b.webp?v=55", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
     },
     pouchCard: { charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
