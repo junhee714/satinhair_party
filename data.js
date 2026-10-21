@@ -106,7 +106,7 @@ window.GAME_DATA = {
     images: [
       "nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
       "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10",
-      "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
+      "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15n", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
       "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10",   // 선셋 허니 루트 (와이드)
       "sw-12", "sw-12bg", "sw-13", "sw-15b", "sw-15c", "sw-16",                         // 선셋 11~16 (드레스룸, 와이드)
       "sw-19n", "sw-19cn", "sw-20", "sw-22", "sw-23", "sw-24",                             // 선셋 18~24 (와이드)
@@ -114,7 +114,7 @@ window.GAME_DATA = {
     // 와이드 캔버스 그림: 가로로 여분 배경(bleed)이 있는 이미지.  canvasW = 그림 전체 폭, frameX = 기준 화면(402x874)이 시작하는 x 위치 (그림 단위)
     //  → 기준 화면(402x874)은 지금까지처럼 화면에 맞추고, 그 바깥의 여분 배경은 화면 가장자리까지 이어서 보여줍니다.
     wide: { canvasW: 520, frameX: 59, keys: ["nerd-1", "nerd-2", "nerd-3", "nerd-4", "nerd-5", "nerd-6", "nerd-7",
-                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
+                                                 "bl-1", "bl-2", "bl-3", "bl-4", "bl-5", "bl-8a", "bl-8b", "bl-9", "bl-10", "bl-12", "bl-12bg", "bl-13", "bl-15", "bl-15n", "bl-15d", "bl-16", "bl-16p", "bl-19", "bl-19c", "bl-20", "bl-22", "bl-23", "bl-24",
                                                  "sw-1", "sw-2", "sw-3", "sw-4", "sw-5", "sw-8a", "sw-8b", "sw-9", "sw-10", "sw-12", "sw-12bg", "sw-13", "sw-15b", "sw-15c", "sw-16", "sw-19n", "sw-19cn", "sw-20", "sw-22", "sw-23", "sw-24"] },
     // 루트별 설정: fill = 와이드 화면 옆 배경을 만들 때 쓰는 이미지, mute = 음악 아이콘 사선 가림 패치
     routes: {
@@ -147,14 +147,14 @@ window.GAME_DATA = {
     pouchCards: {
       // 블썸 17 (스크런치 자막)
       p15: { src: "assets/fx/bl-pouchcard.webp?v=52", rect: { x: -0.0662, y: 0.12655, w: 0.5527, h: 0.3162 },
-             char: "assets/fx/w4-char14b.webp?v=50", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
+             char: "assets/fx/w4-char14b.webp?v=50", clipTop: 0.565, mode: "emerge", settleFrame: "bl-15", durMs: 1500, startX: 0.36, startY: 0.38, startScale: 0.34, startRot: 16 },
       // 블썸 21 (파우치 자막)
       p19: { src: "assets/fx/bl-pouchcard19.webp?v=54", rect: { x: 0.45374, y: 0.24628, w: 0.69303, h: 0.34786 },
              char: "assets/fx/w4-char18.webp?v=45", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
       // 선셋 17 (스크런치 자막) / 선셋 21 (파우치 자막)
       sp15: { src: "assets/fx/sw-pouchcard17.webp?v=55", rect: { x: -0.14677, y: 0.14332, w: 0.70974, h: 0.33551 },
               char: "assets/fx/sw-char14.webp?v=46", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
-      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.47, y: 0.2663, w: 0.53, h: 0.2735 },
+      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.543, y: 0.271, w: 0.512, h: 0.264 },
               char: "assets/fx/sw-char18b.webp?v=55", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
     },
     pouchCard: { charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
@@ -248,7 +248,7 @@ window.GAME_DATA = {
       p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", cardSet: "B", cards: { L: { go: "p14" } } },
       // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
       p14: { route: "party", kind: "transform", frames: ["bl-15d"], char: "assets/fx/w4-char14b.webp?v=50", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p15" },
-      p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", fx: "pouchcard", pouch: "p15", next: "p16" },
+      p15: { route: "party", kind: "dialogue", frames: ["bl-15n"], text: "WK", arrow: "W", fx: "pouchcard", pouch: "p15", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
       p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", cardSet: "B", cards: { R: { go: "p18" } } },
       // 18(=블썸 20 반짝임): 파우치 포즈로 변신, 끝나면 자동으로 19 자막

@@ -1092,7 +1092,7 @@
     if (!settled) { shadow = document.createElement("div"); shadow.className = "pcard pcard-shadow"; place(shadow, P.rect); shadow.style.opacity = "0"; wrap.appendChild(shadow); }
     const card = img(P.src, P.rect, "pcard-card");
     const girl = img(P.char, P.charRect, "pcard-girl");
-    if (!settled) { card.style.opacity = "0"; girl.style.opacity = "0"; }
+    if (!settled) { card.style.opacity = "0"; if (P.mode !== "emerge") girl.style.opacity = "0"; }   // emerge: 지나는 처음부터 카드 앞(위)에 있다
     const ready = settled ? Promise.resolve() : Promise.all([card, girl].map((el) => (el.decode ? el.decode().catch(() => {}) : Promise.resolve())));
     return { key, P, wrap, card, shadow, girl, ready };
   }
@@ -1122,6 +1122,34 @@
       opacity: shadowPass ? f.so * f.o : f.o,
       offset: f.off, easing: i === 0 ? "ease-out" : i === 1 ? ease : i === 2 ? "ease-in-out" : "ease-out",
     }));
+    if (P.mode === "emerge") {
+      // 카드가 지나 '뒤'에서 튀어나온다: 작게 지나 뒤에 숨어 있다가 → 커지며 튀어나와(살짝 지나쳤다가) → 자리로 돌아와 톡 붙는다.  지나도 같이 움찔(받아 올리는 듯) 반응
+      const E = [
+        { x: dx, y: dy, sc: P.startScale, r: P.startRot, o: 0, so: 0, off: 0, e: "ease-out" },
+        { x: dx * 0.85, y: dy * 0.85, sc: P.startScale * 1.25, r: P.startRot * 0.85, o: 1, so: 0.1, off: 0.1, e: "cubic-bezier(.2,.8,.3,1)" },
+        { x: -dx * 0.09, y: -dy * 0.09, sc: 1.1, r: -P.startRot * 0.3, o: 1, so: 0.3, off: 0.42, e: "ease-in-out" },
+        { x: dx * 0.02, y: dy * 0.02, sc: 0.975, r: 1.2, o: 1, so: 0.12, off: 0.63, e: "ease-in-out" },
+        { x: 0, y: -0.2, sc: 1.02, r: -0.5, o: 1, so: 0.05, off: 0.82, e: "ease-out" },
+        { x: 0, y: 0, sc: 1, r: 0, o: 1, so: 0, off: 1, e: "ease-out" },
+      ];
+      const fr = (sh) => E.map((f) => ({ transform: sh ? T(f.x + 1, f.y + 2 + f.so * 30, f.sc, f.r) : T(f.x, f.y, f.sc, f.r), opacity: sh ? f.so * f.o : f.o, offset: f.off, easing: f.e }));
+      const c1 = card.animate(fr(false), { duration: P.durMs, fill: "both" });
+      const c3 = shadow ? shadow.animate(fr(true), { duration: P.durMs, fill: "both" }) : null;
+      girl.style.transformOrigin = "50% 62%";
+      const c2 = girl.animate([
+        { transform: "translate(0,0) scale(1)", offset: 0, easing: "ease-out" },
+        { transform: "translate(0,0.5%) scale(0.998)", offset: 0.1, easing: "cubic-bezier(.2,.9,.3,1)" },
+        { transform: "translate(0,-0.8%) scale(1.008)", offset: 0.3, easing: "ease-in-out" },
+        { transform: "translate(0,0.25%) scale(1)", offset: 0.55, easing: "ease-in-out" },
+        { transform: "translate(0,-0.15%) scale(1.002)", offset: 0.8, easing: "ease-out" },
+        { transform: "translate(0,0) scale(1)", offset: 1 },
+      ], { duration: P.durMs, fill: "both" });
+      story.pcard.push(c1, c2); if (c3) story.pcard.push(c3);
+      if (P.sfx) Sfx.play(P.sfx, P.sfxDelayMs || 0);
+      // 끝나면 지나가 구워진 원래 그림으로 되돌려 둔다 (똑같아 보임 → 다른 화면으로 넘어갈 때 자연스럽게)
+      if (P.settleFrame) window.setTimeout(() => { if (story.pcard.includes(c2)) storyShow(P.settleFrame, { fade: false }); }, P.durMs + 40);
+      return;
+    }
     const a1 = card.animate(frames(false), { duration: P.durMs, fill: "both" });
     const a3 = shadow ? shadow.animate(frames(true), { duration: P.durMs, fill: "both" }) : null;
     const a2 = girl.animate([
@@ -1686,7 +1714,8 @@
     const frames = cfg.frames;
     // reveal: the picture first shows frames[0] (e.g. with sparkles), then slowly melts into reveal.to
     const RV = cfg.reveal || null;
-    if (!keep) storyShow(RV && settled ? RV.to : (cfg.kind === "transform" && cfg.from && !settled && ST.sparkleStyle !== "classic" ? cfg.from : frames[0]), { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
+    if (!keep && settled && cfg.fx === "pouchcard" && ST.pouchCards[cfg.pouch] && ST.pouchCards[cfg.pouch].settleFrame) storyShow(ST.pouchCards[cfg.pouch].settleFrame, { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
+    else if (!keep) storyShow(RV && settled ? RV.to : (cfg.kind === "transform" && cfg.from && !settled && ST.sparkleStyle !== "classic" ? cfg.from : frames[0]), { fade: !instant, ms: fadeMs != null ? fadeMs : ST.fadeMs });
     let revealTextDelay = null;
     if (RV && !settled) {
       const base = instant ? 0 : ST.fadeMs;
