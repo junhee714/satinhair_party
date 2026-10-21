@@ -738,6 +738,7 @@
     ["L", "R"].forEach((s) => { if (cards && cards[s]) patchSets[set][s] = fxSprite(cards[s].src, cards[s].rect, "card-patch"); });
   });
   story.cardSet = "A";
+  if (ST.pouchCard) { layerImg(ST.pouchCard.src); layerImg(ST.pouchCard.char); }
   [FX, FX_SUN].forEach((F) => {
     (F.petals || []).forEach((p) => layerImg(p.src));
     Object.values(F.marks || {}).forEach((m) => layerImg(m.src));
@@ -1052,6 +1053,45 @@
       popAnim.onfinish = () => { popAnim.cancel(); loop(); };
       story.marks.push(popAnim);
     });
+  }
+
+  // 블썸 17: 카드 사진이 앞에서 날아와 지나 '뒤'로 붙는다. (카드 → 지나 누끼 순서로 두 장을 얹고, 지나 쪽이 모션 끝에서 카드 앞으로 올라옴)
+  story.pcard = [];
+  function stopPouchCard(soft) {
+    const els = Array.from(storyFx.querySelectorAll(".pcard"));
+    const anims = story.pcard; story.pcard = [];
+    if (soft && els.length) {
+      els.forEach((el) => el.classList.add("leaving"));
+      window.setTimeout(() => { anims.forEach((a) => { try { a.cancel(); } catch (e) {} }); els.forEach((el) => el.remove()); }, 260);
+    } else {
+      anims.forEach((a) => { try { a.cancel(); } catch (e) {} });
+      els.forEach((el) => el.remove());
+    }
+  }
+  function startPouchCard({ settled = false } = {}) {
+    stopPouchCard();
+    const P = ST.pouchCard;
+    if (!P) return;
+    const card = fxSprite(P.src, P.rect, "pcard pcard-card");
+    const girl = fxSprite(P.char, P.charRect, "pcard pcard-girl");
+    if (settled) return;                                        // 되돌아왔을 때: 이미 붙어 있는 모습 그대로
+    const cx = P.rect.x + P.rect.w / 2, cy = P.rect.y + P.rect.h / 2;
+    const dx = ((P.startX - cx) / P.rect.w) * 100, dy = ((P.startY - cy) / P.rect.h) * 100;     // % of the card's own size
+    const sk = P.sinkAt, Z = P.sinkScale;
+    const ease = "cubic-bezier(.22,.75,.3,1)";
+    const shF = "drop-shadow(0 26px 30px rgba(120,50,80,.38))", shB = "drop-shadow(0 2px 4px rgba(120,50,80,.16))", sh0 = "drop-shadow(0 0 0 rgba(120,50,80,0))";
+    const a1 = card.animate([
+      { transform: `translate(${dx}%,${dy}%) scale(${P.startScale}) rotate(${P.startRot}deg)`, opacity: 0, filter: shF, offset: 0, easing: "ease-out" },
+      { transform: `translate(${dx * 0.93}%,${dy * 0.93}%) scale(${P.startScale * 1.03}) rotate(${P.startRot * 0.9}deg)`, opacity: 1, filter: shF, offset: 0.1, easing: ease },
+      { transform: `translate(-1.5%,-1%) scale(${Z}) rotate(-3deg)`, opacity: 1, filter: shB, offset: sk, easing: "ease-in-out" },
+      { transform: "translate(0.4%,0.3%) scale(1.035) rotate(0.8deg)", opacity: 1, filter: shB, offset: sk + (1 - sk) * 0.5, easing: "ease-out" },
+      { transform: "translate(0,0) scale(1) rotate(0deg)", opacity: 1, filter: sh0, offset: 1 },
+    ], { duration: P.durMs, fill: "both" });
+    const a2 = girl.animate([
+      { opacity: 0, offset: 0 }, { opacity: 0, offset: P.frontOffAt }, { opacity: 1, offset: P.frontOnAt }, { opacity: 1, offset: 1 },
+    ], { duration: P.durMs, fill: "both" });
+    story.pcard.push(a1, a2);
+    if (P.sfx) Sfx.play(P.sfx);
   }
 
   // "pressed" look of a card as a patch over the picture (hover / press / locked-in)
@@ -1572,6 +1612,7 @@
   function stopFxAll(soft) {
     clearPetals(soft);
     stopMarks(soft);
+    stopPouchCard(soft);
     glossStop();
     xfStop();
     spStop();
@@ -1650,6 +1691,10 @@
     if (cfg.sway && frames.length > 1 && !keep) startSway(frames);
     if (cfg.fx === "petals" && !settled) storyLater(spawnPetals, fxDelayMs != null ? fxDelayMs : instant ? 120 : 200);
     if (cfg.fx === "marks" && !keep) storyLater(() => startMarks({ pop: !settled }), settled ? 0 : ST.marks.startDelayMs);
+    if (cfg.fx === "pouchcard") {
+      const pcDelay = settled ? 0 : (textDelayMs != null ? textDelayMs : instant ? 0 : TY.afterFadeMs) + ((ST.pouchCard && ST.pouchCard.delayMs) || 0);
+      storyLater(() => startPouchCard({ settled }), pcDelay);
+    }
     if (cfg.kind === "result") storyLater(() => showToast(ST.endToast, 2600, "top"), 1100);
   }
 

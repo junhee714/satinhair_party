@@ -66,7 +66,8 @@ window.GAME_DATA = {
     comb:  { src: "assets/audio/sfx/comb.mp3?v=30",  volume: 0.9 },
     shine: { src: "assets/audio/sfx/shine.mp3?v=30", volume: 0.8 },
     wind:  { src: "assets/audio/sfx/wind.mp3?v=30",  volume: 1.0, delayMs: 100 },   // delayMs: 편지 화면의 흰 페이드가 걷히며 날아오는 모습이 보이는 시점에 맞춤
-    glow:  { src: "assets/audio/sfx/glow.mp3?v=30",  volume: 0.8 },                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
+    glow:  { src: "assets/audio/sfx/glow.mp3?v=30",  volume: 0.8 },
+    stick: { src: "assets/audio/sfx/stick.mp3?v=52", volume: 0.7 },                // 블썸 17: 카드가 앞에서 날아와 뒤로 붙을 때 (쉬잉 + 톡)                 // 머리 반짝임(고데기로 빗은 뒤) 효과 때
   },
   crossFadeMs: 1800,          // "초대장 받기" → 너드 지나: 첫 곡이 사라지는 시간 (두 번째 곡 페이드인과 겹침)
   },
@@ -139,6 +140,14 @@ window.GAME_DATA = {
     afterFx: { fadeMs: 180, textDelayMs: 40 },
     //  sparkleStyle: "classic" = 선셋 18→19 에서 쓰던 반짝임(나선 빛이 지나 뒤에서 피어오르고 빛줄기가 한 번 훑고 지나감, 2.2초) 을 모든 변신에 사용.  "new" = 나선 빛 올라가며 사라지는 효과(아래 sparkle 설정)
     sparkleStyle: "classic",
+    //  pouchCard: 블썸 17(스크런치 자막) — 자막이 올라올 때 카드 사진이 "앞에서 날아와 지나 뒤로 붙는" 모션.
+    //   rect = 카드 최종 위치(402x874 기준 비율), char = 지나 누끼(카드가 지나 '뒤'에 오도록 위에 한 장 더 덮음, charRect = 와이드 그림 전체)
+    //   delayMs 자막 시작 기준 대기 / durMs 전체 시간 / startScale·startX·startY 처음 크기(앞)·중심 위치(화면 비율) / startRot 처음 기울기(도)
+    //   sinkAt 뒤로 쑥 들어가는 시점(0~1)·sinkScale 그때 크기 / frontOffAt~frontOnAt 지나가 카드 앞으로 올라오는 구간(0~1)
+    pouchCard: { src: "assets/fx/bl-pouchcard.webp?v=52", rect: { x: -0.0662, y: 0.12655, w: 0.5527, h: 0.3162 },
+                 char: "assets/fx/w4-char14b.webp?v=50", charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
+                 delayMs: 80, durMs: 1000, startScale: 1.7, startX: 0.52, startY: 0.56, startRot: 10,
+                 sinkAt: 0.68, sinkScale: 0.94, frontOffAt: 0.5, frontOnAt: 0.74, sfx: "stick" },
     //  routeStart: 너드 지나 5 의 카드(go:"@...")를 누르면 처음 들어가는 화면
     routeStart: { "@blossom": "bl1", "@sunset": "sn1" },
     // 블썸 11 (와이드 반짝임 그림): 빛이 차오르고(bloomMs) → 밝은 띠가 아래→위로 한 번 훑고(bandMs, 그림 높이 비율 bandFrom→bandTo, 폭 bandHalf) → 사라짐(fadeMs).  totalMs 는 아래 transform 과 같이 씀
@@ -227,7 +236,7 @@ window.GAME_DATA = {
       p13: { route: "party", kind: "choice", frames: ["bl-13"], text: "WJ", arrow: "W", cardSet: "B", cards: { L: { go: "p14" } } },
       // 14(=블썸 16 반짝임): 눌린 카드 화면에서 스크런치 포즈로 아래→위로 변신, 끝나면 자동으로 15 자막
       p14: { route: "party", kind: "transform", frames: ["bl-15d"], char: "assets/fx/w4-char14b.webp?v=50", spiral: { cx: 0.475, top: 0.19, bot: 0.74 }, veil: "fast", transient: true, next: "p15" },
-      p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", next: "p16" },
+      p15: { route: "party", kind: "dialogue", frames: ["bl-15"], text: "WK", arrow: "W", fx: "pouchcard", next: "p16" },
       // 16: 이번엔 파우치(오른쪽)를 고름
       p16: { route: "party", kind: "choice", frames: ["bl-16"], text: "WL", arrow: "W", cardSet: "B", cards: { R: { go: "p18" } } },
       // 18(=블썸 20 반짝임): 파우치 포즈로 변신, 끝나면 자동으로 19 자막
