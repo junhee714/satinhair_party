@@ -149,12 +149,12 @@ window.GAME_DATA = {
       p15: { src: "assets/fx/bl-pouchcard.webp?v=52", rect: { x: -0.0662, y: 0.12655, w: 0.5527, h: 0.3162 },
              char: "assets/fx/w4-char14b.webp?v=50", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
       // 블썸 21 (파우치 자막)
-      p19: { src: "assets/fx/bl-pouchcard19.webp?v=54", rect: { x: 0.45374, y: 0.24628, w: 0.69303, h: 0.34786 },
+      p19: { src: "assets/fx/bl-pouchcard19b.webp?v=64", rect: { x: 0.44366, y: 0.25181, w: 0.7215, h: 0.35512 },
              char: "assets/fx/w4-char18.webp?v=45", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
       // 선셋 17 (스크런치 자막) / 선셋 21 (파우치 자막)
       sp15: { src: "assets/fx/sw-pouchcard17.webp?v=55", rect: { x: -0.14677, y: 0.14332, w: 0.70974, h: 0.33551 },
               char: "assets/fx/sw-char14.webp?v=46", clipTop: 0.565, startX: 0.52, startY: 0.56, startRot: 10 },
-      sp19: { src: "assets/fx/sw-pouchcard21.webp?v=55", rect: { x: 0.407, y: 0.2436, w: 0.619, h: 0.3191 },
+      sp19: { src: "assets/fx/sw-pouchcard21b.webp?v=64", rect: { x: 0.48232, y: 0.25147, w: 0.52499, h: 0.30084 },
               char: "assets/fx/sw-char18b.webp?v=55", clipTop: 0.598, startX: 0.48, startY: 0.56, startRot: -10 },
     },
     pouchCard: { charRect: { x: -0.146766, y: 0, w: 1.293532, h: 1 },
