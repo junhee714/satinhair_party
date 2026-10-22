@@ -38,11 +38,12 @@
   const HING = 409 * R * K;                               // hinge line (layer px)
   const PIV_OFF = (743 - 409) * R * K / S;                // hinge -> pivot, design px
   const ENV_CX = 201, ENVW = 1133 * K / S, ENVH = (1077 - 409) * R * K / S;   // centre x / width / body height of the envelope (design px)
-  const HY0 = 385, HY1 = 509;
+  const DY = -30;                                      // 봉투+편지지 전체를 위로 올린 양 (design px) — 마지막 화면이 가운데 오도록
+  const HY0 = 385 + DY, HY1 = 509 + DY;
   const LC = 356.93043600000004, LO = 299.045564, DCAM = 2500;       // flap lengths (layer px, hinge -> tip) and camera distance for the fold's perspective                         // hinge y: when it lands / when the letter is out (design px)
 
   // ---- letter (design px): width 330, final top 175 (upright, centred)
-  const LW = 356, LET_X = (402 - LW) / 2, LET_TOP = 174, LET_PEEK = 110, PAD = 2;   // LET_PEEK: 편지가 처음에 봉투 입구 아래로 깊이 숨어 있다가 스르르 올라옴 (이전 14 는 시작하자마자 하얀 조각이 툭 나타났음)
+  const LW = 356, LET_X = (402 - LW) / 2, LET_TOP = 174 + DY, LET_PEEK = 110, PAD = 2;   // LET_PEEK: 편지가 처음에 봉투 입구 아래로 깊이 숨어 있다가 스르르 올라옴 (이전 14 는 시작하자마자 하얀 조각이 툭 나타났음)
   // button on the letter (design px, relative to the letter's top): 162.6 x 41.8, under the "입장 조건" box
   const BW = 138.2, BH = 35.6, BTN_DY = 350.8;
   const BS = 1.0;                                       // the button is drawn / shown 1.0x about its centre (keep in sync with HOTSPOT_RECTS.introInvite)
