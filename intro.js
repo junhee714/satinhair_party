@@ -24,10 +24,10 @@
   // 전체 속도 배율 (data.js 의 introSpeed: 1 = 이전 속도, 1.25 = 25% 빠르게). 아래 값은 1배속 기준 시간(ms)
   const SPD = Math.max(0.5, Math.min(2, (window.GAME_DATA && window.GAME_DATA.introSpeed) || 1));
   const FLY0 = 250 / SPD, FLY = 1350 / SPD;               // envelope flies in from the left and lands
-  const FLAP0 = 2150 / SPD, FLAP = 1150 / SPD;            // flap opens (frontal)
-  const LET0 = 3050 / SPD, LET = 1900 / SPD;              // letter is pulled up out of the envelope
-  const DROP0 = 3250 / SPD, DROP = 1750 / SPD;            // envelope sinks to the bottom while the letter rises
-  const TOTAL = 5100 / SPD;
+  const FLAP0 = 1480 / SPD, FLAP = 1050 / SPD;            // 봉투가 멈추는 순간(착지 감속 끝자락)에 바로 뚜껑이 열리기 시작             // flap opens (frontal)
+  const LET0 = 2150 / SPD, LET = 1950 / SPD;      // 뚝 끊기지 않게: 뚜껑이 70% 쯤 열렸을 때 편지가 스르르 올라오기 시작              // letter is pulled up out of the envelope
+  const DROP0 = 2300 / SPD, DROP = 1800 / SPD;            // envelope sinks to the bottom while the letter rises
+  const TOTAL = 4150 / SPD;
   const WIND2 = ((window.GAME_DATA && window.GAME_DATA.introWindLetterMs) || 2700) / SPD;   // 2nd wind sound: starts as the flap finishes opening, peaks while the letter is pulled out (ms after the intro starts)
   const START_X = -350, START_Y = -240, START_ROT = 24 * Math.PI / 180, START_SCALE = 1.14;   // like the mp4: enters from the left edge, tilted clockwise, flap pointing down-right
 
@@ -52,7 +52,7 @@
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
   const easeOutBack = (u, s = 0.8) => { u = clamp01(u) - 1; return 1 + u * u * ((s + 1) * u + s); };
   const easeInOut = (u) => { u = clamp01(u); return 0.5 - 0.5 * Math.cos(Math.PI * u); };
-  const easeLetter = (u) => { u = clamp01(u); const a = 0.5 - 0.5 * Math.cos(Math.PI * u); return 0.45 * a + 0.55 * (1 - Math.pow(1 - u, 2.4)); };
+  const easeLetter = (u) => { u = clamp01(u); const a = 0.5 - 0.5 * Math.cos(Math.PI * u); return 0.82 * a + 0.18 * (1 - Math.pow(1 - u, 2.4)); };   // 시작은 부드럽게(속도 0 에서 출발), 끝은 천천히 멈춤
   const smooth01 = (x) => { x = clamp01(x); return x * x * (3 - 2 * x); };
   const load = (src) => new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = src; });
   let img = {};
