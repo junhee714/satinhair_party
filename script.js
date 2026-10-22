@@ -1077,6 +1077,16 @@
     stopPouchCard();
     const P = ST.pouchCard && ST.pouchCards && ST.pouchCards[key] ? { ...ST.pouchCard, ...ST.pouchCards[key] } : null;
     if (!P) return null;
+    // anchorRight: 폰마다 화면 폭/높이 비율이 달라서 그림 틀(402x874) 오른쪽 바깥에 보이는 여분이 다르다 → 카드의 오른쪽 모서리가 '실제 화면 오른쪽 끝'에서 일정한 여백(edgeMargin)만큼 떨어지게 옆으로 밀어 준다. (모서리는 잘리지 않음)
+    if (P.anchorRight) {
+      const fr = storyFx.getBoundingClientRect(), sc = sceneStory.getBoundingClientRect();
+      if (fr.width > 0) {
+        const targetRight = (sc.right - fr.left) / fr.width - (P.edgeMargin != null ? P.edgeMargin : 0.025);
+        const shift = Math.max(P.shiftMin != null ? P.shiftMin : -0.06, Math.min(P.shiftMax != null ? P.shiftMax : 0.10, targetRight - (P.rect.x + (P.visRight || 0.97) * P.rect.w)));
+        P.rect = { ...P.rect, x: P.rect.x + shift };
+        P.startX = (P.startX || 0) + shift;
+      }
+    }
     const wrap = document.createElement("div");
     wrap.className = "pcard-wrap";
     wrap.style.left = `${-PC_SIDE * 100}%`; wrap.style.width = `${(1 + 2 * PC_SIDE) * 100}%`;
