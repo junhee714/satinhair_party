@@ -21,12 +21,14 @@
   const invite = document.getElementById("btnInvite");
 
   // ---- timeline (ms)
-    const FLY0 = 250, FLY = 1350;               // envelope flies in from the left and lands
-  const FLAP0 = 2150, FLAP = 1150;             // flap opens (frontal)
-  const LET0 = 3050, LET = 1900;              // letter is pulled up out of the envelope
-  const DROP0 = 3250, DROP = 1750;            // envelope sinks to the bottom while the letter rises
-  const TOTAL = 5100;
-  const WIND2 = (window.GAME_DATA && window.GAME_DATA.introWindLetterMs) || 2700;   // 2nd wind sound: starts as the flap finishes opening, peaks while the letter is pulled out (ms after the intro starts)
+  // 전체 속도 배율 (data.js 의 introSpeed: 1 = 이전 속도, 1.25 = 25% 빠르게). 아래 값은 1배속 기준 시간(ms)
+  const SPD = Math.max(0.5, Math.min(2, (window.GAME_DATA && window.GAME_DATA.introSpeed) || 1));
+  const FLY0 = 250 / SPD, FLY = 1350 / SPD;               // envelope flies in from the left and lands
+  const FLAP0 = 2150 / SPD, FLAP = 1150 / SPD;            // flap opens (frontal)
+  const LET0 = 3050 / SPD, LET = 1900 / SPD;              // letter is pulled up out of the envelope
+  const DROP0 = 3250 / SPD, DROP = 1750 / SPD;            // envelope sinks to the bottom while the letter rises
+  const TOTAL = 5100 / SPD;
+  const WIND2 = ((window.GAME_DATA && window.GAME_DATA.introWindLetterMs) || 2700) / SPD;   // 2nd wind sound: starts as the flap finishes opening, peaks while the letter is pulled out (ms after the intro starts)
   const START_X = -350, START_Y = -240, START_ROT = 24 * Math.PI / 180, START_SCALE = 1.14;   // like the mp4: enters from the left edge, tilted clockwise, flap pointing down-right
 
   // ---- envelope layers are pre-scaled by K (frame px -> canvas px); frame = the frontal open envelope photo (1143x1080)
