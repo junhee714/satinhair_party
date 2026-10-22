@@ -42,7 +42,7 @@
   const LC = 356.93043600000004, LO = 299.045564, DCAM = 2500;       // flap lengths (layer px, hinge -> tip) and camera distance for the fold's perspective                         // hinge y: when it lands / when the letter is out (design px)
 
   // ---- letter (design px): width 330, final top 175 (upright, centred)
-  const LW = 356, LET_X = (402 - LW) / 2, LET_TOP = 174, LET_PEEK = 14, PAD = 2;
+  const LW = 356, LET_X = (402 - LW) / 2, LET_TOP = 174, LET_PEEK = 110, PAD = 2;   // LET_PEEK: 편지가 처음에 봉투 입구 아래로 깊이 숨어 있다가 스르르 올라옴 (이전 14 는 시작하자마자 하얀 조각이 툭 나타났음)
   // button on the letter (design px, relative to the letter's top): 162.6 x 41.8, under the "입장 조건" box
   const BW = 138.2, BH = 35.6, BTN_DY = 350.8;
   const BS = 1.0;                                       // the button is drawn / shown 1.0x about its centre (keep in sync with HOTSPOT_RECTS.introInvite)
@@ -120,6 +120,7 @@
       c.drawImage(layer, 0, y, w, hs, PVT.x + (0 - PVT.x) * m.sc, a.y, dw, dh + 0.7);
     }
   }
+  const FW = 0.10;                                                  // (rad) 뚜껑이 수직이 되는 지점 앞뒤로 앞/뒷면을 겹쳐 바꾸는 폭
   function drawEnvelope(p, t, alpha, full) {
     const hy = full ? hingeY(t) : HY0;
     const phi = full ? Math.PI * easeInOut((t - FLAP0) / FLAP) : 0;
@@ -128,11 +129,14 @@
     // ---- back parts: opened flap (behind), the envelope's inside
     ctx.save(); envTransform(p, hy);
     if (phi > 0) {
-      if (phi > Math.PI / 2) foldFlap(ctx, img.flap_shade, true, phi);
+      if (phi > Math.PI / 2 - FW) {                                // 뚜껑이 수직(옆면)이 되는 순간 앞면→뒷면이 뚝 바뀌지 않게 서로 겹쳐서 바꿔 줌
+        const oa = smooth01((phi - (Math.PI / 2 - FW)) / (2 * FW));
+        ctx.save(); ctx.globalAlpha = alpha * oa; foldFlap(ctx, img.flap_shade, true, phi); ctx.restore();
+      }
       // the inside starts exactly at the hinge: its top edge must never peek out above the lifting flap (that was the thin band along the top edge)
       const lift = 4 * (1 - smooth01((phi - Math.PI / 3) / (Math.PI / 6)));
       ctx.save(); ctx.beginPath(); ctx.rect(-20, HING + lift, img.open_interior.width + 40, img.open_interior.height + 40); ctx.clip();
-      ctx.drawImage(img.open_interior, 0, 0);
+      ctx.save(); ctx.globalAlpha = alpha * smooth01(phi / 0.12); ctx.drawImage(img.open_interior, 0, 0); ctx.restore();
       ctx.save(); ctx.globalAlpha = alpha * smooth01(phi / (Math.PI * 0.8)); ctx.drawImage(img.interior_shade, 0, 0); ctx.restore();
       ctx.restore();
     }
@@ -160,21 +164,25 @@
     }
     // ---- front parts: body (one layer, one set of creases), then the closing flap
     ctx.save(); envTransform(p, hy);
-    if (lp > 0) {
-      ctx.shadowColor = "rgba(95,40,65,0.26)"; ctx.shadowBlur = 7 * S; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = -1 * S;
+    const shA = full ? smooth01((t - LET0) / (LET * 0.22)) : 0;     // 몸통 그림자도 편지가 올라오기 시작할 때 툭 생기지 않고 서서히 진해짐
+    if (shA > 0) {
+      ctx.shadowColor = "rgba(95,40,65," + (0.26 * shA).toFixed(3) + ")"; ctx.shadowBlur = 7 * S; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = -1 * S;
     }
     // closed: the ORIGINAL closed-envelope photo (body + flap, nothing else on top -> no doubled lines).
     // as the flap starts to lift the body hands over to the opened-envelope body (closed body fades out over the first ~8 degrees, on top of a solid body so nothing shows through)
     const hand = smooth01(phi / (8 * Math.PI / 180));
-    if (hand > 0) {
+    if (hand >= 1) {
       ctx.drawImage(img.open_panels, 0, 0);
-      ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    }
-    if (hand < 1) {
-      ctx.save(); ctx.globalAlpha = alpha * (1 - hand); ctx.drawImage(img.closed_body, 0, 0); ctx.restore();
+    } else if (hand > 0) {                                           // 닫힌 몸통 위에 열린 몸통을 서서히 덮어 가며 바꿈 (가장자리 선이 툭 바뀌지 않게)
+      ctx.save(); ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.drawImage(img.closed_body, 0, 0);
+      ctx.globalAlpha = alpha * hand; ctx.drawImage(img.open_panels, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.drawImage(img.closed_body, 0, 0);
     }
     ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    if (phi <= Math.PI / 2) {
+    if (phi <= Math.PI / 2 + FW) {
       if (phi === 0) {
         ctx.drawImage(img.closed_flap, 0, 0);
       } else {
@@ -185,7 +193,10 @@
         foldFlap(flapCtx, img.closed_flap, false, phi);
         flapCtx.setTransform(1, 0, 0, 1, 0, 0);
         flapCtx.globalCompositeOperation = "source-atop"; flapCtx.fillStyle = "rgba(120,48,84," + (0.26 * Math.sin(phi)).toFixed(3) + ")"; flapCtx.fillRect(0, 0, CW, CH);
-        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(flapCan, 0, 0); ctx.restore();
+        const ca = 1 - smooth01((phi - (Math.PI / 2 - FW)) / (2 * FW));       // 수직 근처에서 앞면 뚜껑이 서서히 사라짐
+        const k0 = smooth01(phi / 0.06);                                       // 열리기 시작하는 첫 프레임: 원본 사진 → 접히는 뚜껑으로 서서히 바뀜
+        if (k0 < 1) ctx.drawImage(img.closed_flap, 0, 0);
+        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = alpha * ca * k0; ctx.drawImage(flapCan, 0, 0); ctx.restore();
       }
     }
     ctx.restore();
