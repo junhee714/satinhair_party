@@ -89,7 +89,7 @@ window.GAME_DATA = {
     pressHoldMs: 220,       // 카드를 누른 뒤 눌린 모습을 보여주고 넘어가기까지
     endToast: "다음 화면 이미지를 기다리는 중이에요",
     // 마지막 화면 "선물받기" 버튼을 누르면 새 탭으로 열리는 주소
-    giftUrl: "https://narka.co.kr/product/detail.html?product_no=135#none",
+    giftUrl: "https://narka.co.kr/event",
     // 1-2 / 3-4 는 사용자가 탭하기 전까지 두 포즈를 번갈아 보여주며 좌우로 흔들림
     sway: { holdMs: 520, fadeMs: 150 },
     // 자막 타자기: 글자 하나당 ms, 띄어쓰기 때 추가 대기, 줄바꿈 대기, 글자 페이드인

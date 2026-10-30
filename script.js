@@ -1973,7 +1973,7 @@
     const url = ST.giftUrl;
     if (!url) return;
     const w = window.open(url, "_blank", "noopener");
-    if (!w) window.location.href = url;
+    if (!w) { try { (window.top || window).location.href = url; } catch (e) { window.location.href = url; } }   // 새 탭이 막히면 같은 창에서 이동 (카페24 iframe 안이면 바깥 페이지 전체가 이동)
   };
   window.LetterScene.onRetry = storyUndo;                                   // 다시하기: the whole game from the start
   document.getElementById("storyBack").addEventListener("click", storyBack);
